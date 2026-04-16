@@ -153,15 +153,28 @@ export function setCurrentUserId(userId: string): void {
   window.localStorage.setItem(currentUserKey, userId);
 }
 
+export function clearCurrentUserId(): void {
+  window.localStorage.removeItem(currentUserKey);
+}
+
 export async function registerUser(
-  _data: AppData,
+  data: AppData,
   input: Omit<User, "id" | "createdAt">,
+  authUserId?: string,
 ): Promise<{ data: AppData; user: User }> {
   const normalizedEmail = input.email.trim().toLowerCase();
+  const existing = data.users.find((user) => user.email.toLowerCase() === normalizedEmail);
+
+  if (existing) {
+    setCurrentUserId(existing.id);
+    return { data, user: existing };
+  }
+
   const [dbUser] = await request<DbUser[]>("users?on_conflict=email", {
     method: "POST",
     headers: { Prefer: "resolution=merge-duplicates,return=representation" },
     body: JSON.stringify({
+      ...(authUserId ? { id: authUserId } : {}),
       first_name: input.firstName.trim(),
       last_name: input.lastName.trim(),
       email: normalizedEmail,

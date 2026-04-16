@@ -5,16 +5,12 @@ import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { Logo } from "@/components/Logo";
 import { calculateStandings, getOutcomeFromScore, getUserName, isMatchClosed, outcomeLabels } from "@/lib/scoring";
-import {
-  getCurrentUserId,
-  getInitialData,
-  registerUser,
-  setCurrentUserId,
-  upsertPrediction,
-} from "@/lib/storage";
+import { getSupabaseClient } from "@/lib/supabase";
+import { clearCurrentUserId, getInitialData, registerUser, upsertPrediction } from "@/lib/storage";
 import type { AppData, Match, Prediction, User } from "@/lib/types";
 
 type ActiveTab = "fixture" | "ranking" | "rules";
+type AuthMode = "signIn" | "signUp";
 
 const tournamentName = "Prode Mundial 2026";
 
@@ -40,13 +36,17 @@ export default function HomePage() {
   const [data, setData] = useState<AppData | null>(null);
   const [currentUserId, setCurrentUser] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>("fixture");
+  const [authMode, setAuthMode] = useState<AuthMode>("signIn");
   const [message, setMessage] = useState("");
 
   useEffect(() => {
     async function loadData() {
       const initialData = await getInitialData();
+      const { data: sessionData } = await getSupabaseClient().auth.getSession();
+      const sessionEmail = sessionData.session?.user.email?.toLowerCase();
+      const sessionUser = initialData.users.find((user) => user.email.toLowerCase() === sessionEmail);
       setData(initialData);
-      setCurrentUser(getCurrentUserId() ?? initialData.users[0]?.id ?? null);
+      setCurrentUser(sessionUser?.id ?? null);
     }
 
     loadData().catch(() => {
@@ -60,7 +60,7 @@ export default function HomePage() {
   );
   const standings = useMemo(() => (data ? calculateStandings(data) : []), [data]);
 
-  async function handleRegister(event: FormEvent<HTMLFormElement>) {
+  async function handleAuth(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!data) return;
 
@@ -69,35 +69,92 @@ export default function HomePage() {
     const lastName = String(form.get("lastName") ?? "").trim();
     const email = String(form.get("email") ?? "").trim();
     const area = String(form.get("area") ?? "").trim();
+    const password = String(form.get("password") ?? "");
 
-    if (!firstName || !lastName || !email) {
-      setMessage("Completá nombre, apellido y email para continuar.");
+    if (!email || !password) {
+      setMessage("Completá email y contraseña para continuar.");
       return;
     }
 
-    const result = await registerUser(data, { firstName, lastName, email, area });
+    const supabase = getSupabaseClient();
+
+    if (authMode === "signIn") {
+      const { data: authData, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        setMessage("No pudimos iniciar sesión. Revisá email y contraseña.");
+        return;
+      }
+
+      const nextData = await getInitialData();
+      const user = nextData.users.find((item) => item.email.toLowerCase() === authData.user.email?.toLowerCase());
+      if (!user) {
+        setData(nextData);
+        setMessage("Tu acceso existe, pero falta crear el perfil del prode. Usá Crear cuenta una vez.");
+        setAuthMode("signUp");
+        return;
+      }
+
+      setData(nextData);
+      setCurrentUser(user.id);
+      setMessage(`Listo, ${user.firstName}. Ya podés cargar tus pronosticos.`);
+      setActiveTab("fixture");
+      return;
+    }
+
+    if (!firstName || !lastName) {
+      setMessage("Completá nombre, apellido, email y contraseña para crear la cuenta.");
+      return;
+    }
+
+    const { data: authData, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          firstName,
+          lastName,
+          area,
+        },
+      },
+    });
+
+    if (error || !authData.user) {
+      setMessage(error?.message ?? "No pudimos crear la cuenta.");
+      return;
+    }
+
+    const result = await registerUser(data, { firstName, lastName, email, area }, authData.user.id);
     setData(result.data);
-    setCurrentUser(result.user.id);
-    setMessage(`Listo, ${result.user.firstName}. Ya podés cargar tus pronosticos.`);
-    setActiveTab("fixture");
+
+    if (authData.session) {
+      setCurrentUser(result.user.id);
+      setMessage(`Listo, ${result.user.firstName}. Ya podés cargar tus pronosticos.`);
+      setActiveTab("fixture");
+    } else {
+      setCurrentUser(null);
+      setMessage("Cuenta creada. Revisá tu email para confirmar el acceso antes de ingresar.");
+      setAuthMode("signIn");
+    }
   }
 
   async function handlePrediction(match: Match, homeScore: number, awayScore: number) {
     if (!data || !currentUser) return;
 
     if (isMatchClosed(match)) {
-      setMessage("Este partido ya cerro. Los pronosticos se pueden editar hasta un minuto antes del inicio.");
+      setMessage("Este partido ya cerró. Los pronósticos se pueden editar hasta un minuto antes del inicio.");
       return;
     }
 
     setData(await upsertPrediction(data, currentUser.id, match.id, homeScore, awayScore));
-    setMessage("Pronostico guardado.");
+    setMessage("Pronóstico guardado.");
   }
 
-  function handleUserChange(userId: string) {
-    setCurrentUser(userId);
-    setCurrentUserId(userId);
-    setMessage("");
+  async function handleSignOut() {
+    await getSupabaseClient().auth.signOut();
+    clearCurrentUserId();
+    setCurrentUser(null);
+    setAuthMode("signIn");
+    setMessage("Sesión cerrada. Ingresá con email y contraseña para jugar.");
   }
 
   if (!data) {
@@ -133,30 +190,58 @@ export default function HomePage() {
               <h2 className="section-title" id="register-title">
                 Registro / acceso
               </h2>
-              <p className="section-copy">
-                Ingresá con tu email. Si ya existe, recuperamos tu usuario automaticamente.
-              </p>
-              <form className="stack" onSubmit={handleRegister}>
-                <div className="grid-two">
-                  <div className="field">
-                    <label htmlFor="firstName">Nombre</label>
-                    <input id="firstName" name="firstName" autoComplete="given-name" required />
+              <p className="section-copy">Ingresá con tu email y contraseña para cargar tus pronósticos.</p>
+              <div className="auth-switch" aria-label="Modo de acceso">
+                <button
+                  className={`tab ${authMode === "signIn" ? "tab-active" : ""}`}
+                  type="button"
+                  onClick={() => setAuthMode("signIn")}
+                >
+                  Ingresar
+                </button>
+                <button
+                  className={`tab ${authMode === "signUp" ? "tab-active" : ""}`}
+                  type="button"
+                  onClick={() => setAuthMode("signUp")}
+                >
+                  Crear cuenta
+                </button>
+              </div>
+              <form className="stack" onSubmit={handleAuth}>
+                {authMode === "signUp" ? (
+                  <div className="grid-two">
+                    <div className="field">
+                      <label htmlFor="firstName">Nombre</label>
+                      <input id="firstName" name="firstName" autoComplete="given-name" required />
+                    </div>
+                    <div className="field">
+                      <label htmlFor="lastName">Apellido</label>
+                      <input id="lastName" name="lastName" autoComplete="family-name" required />
+                    </div>
                   </div>
-                  <div className="field">
-                    <label htmlFor="lastName">Apellido</label>
-                    <input id="lastName" name="lastName" autoComplete="family-name" required />
-                  </div>
-                </div>
+                ) : null}
                 <div className="field">
                   <label htmlFor="email">Email</label>
                   <input id="email" name="email" type="email" autoComplete="email" required />
                 </div>
+                {authMode === "signUp" ? (
+                  <div className="field">
+                    <label htmlFor="area">Area / equipo / sector opcional</label>
+                    <input id="area" name="area" />
+                  </div>
+                ) : null}
                 <div className="field">
-                  <label htmlFor="area">Area / equipo / sector opcional</label>
-                  <input id="area" name="area" />
+                  <label htmlFor="password">Contraseña</label>
+                  <input
+                    id="password"
+                    name="password"
+                    type="password"
+                    autoComplete={authMode === "signIn" ? "current-password" : "new-password"}
+                    required
+                  />
                 </div>
                 <button className="button button-primary" type="submit">
-                  Ingresar o registrarme
+                  {authMode === "signIn" ? "Ingresar" : "Crear cuenta"}
                 </button>
               </form>
             </div>
@@ -167,30 +252,7 @@ export default function HomePage() {
 
         <section className="panel">
           <div className="panel-content">
-            <div className="grid-two">
-              <div>
-                <h2 className="section-title">Panel participante</h2>
-                <p className="section-copy">
-                  {currentUser
-                    ? `Estas jugando como ${getUserName(currentUser)}.`
-                    : "Seleccioná o registrá un participante para cargar pronosticos."}
-                </p>
-              </div>
-              <div className="field">
-                <label htmlFor="currentUser">Participante activo</label>
-                <select
-                  id="currentUser"
-                  value={currentUserId ?? ""}
-                  onChange={(event) => handleUserChange(event.target.value)}
-                >
-                  {data.users.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {getUserName(user)} {user.area ? `- ${user.area}` : ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
+            <ParticipantStatus currentUser={currentUser} onSignOut={handleSignOut} />
 
             <div className="tabs" role="tablist" aria-label="Secciones del prode">
               {[
@@ -218,6 +280,43 @@ export default function HomePage() {
         </section>
       </main>
       <Footer />
+    </div>
+  );
+}
+
+function ParticipantStatus({
+  currentUser,
+  onSignOut,
+}: {
+  currentUser: User | null;
+  onSignOut: () => void;
+}) {
+  if (!currentUser) {
+    return (
+      <div className="participant-status participant-status-empty">
+        <div>
+          <h2 className="section-title">Ingresá para jugar</h2>
+          <p className="section-copy">
+            Creá tu cuenta o iniciá sesión para cargar y modificar tus pronósticos.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="participant-status">
+      <div>
+        <span className="badge badge-ok">Participante activo</span>
+        <h2 className="section-title">{getUserName(currentUser)}</h2>
+        <p className="section-copy">
+          {currentUser.area ? `${currentUser.area} · ` : ""}
+          {currentUser.email}
+        </p>
+      </div>
+      <button className="button button-secondary" type="button" onClick={onSignOut}>
+        Cerrar sesión
+      </button>
     </div>
   );
 }
@@ -271,7 +370,7 @@ function Fixture({
                 />
                 {closed ? (
                   <div className="message message-warning">
-                    Este partido ya cerro. El pronostico se podia editar hasta un minuto antes del inicio.
+                    Este partido ya cerró. El pronóstico se podía editar hasta un minuto antes del inicio.
                   </div>
                 ) : null}
               </article>
@@ -356,7 +455,7 @@ function PredictionScoreForm({
       <div className="score-actions">
         <span className="badge">{previewOutcome}</span>
         <button className="button button-primary" disabled={!canSave} type="submit">
-          Guardar pronostico
+          Guardar pronóstico
         </button>
       </div>
     </form>
@@ -369,9 +468,9 @@ function Ranking({ standings }: { standings: ReturnType<typeof calculateStanding
       <table className="table">
         <thead>
           <tr>
-            <th>Posicion</th>
+            <th>Posición</th>
             <th>Participante</th>
-            <th>Area / equipo</th>
+            <th>Área / equipo</th>
             <th>Puntos</th>
             <th>Aciertos</th>
           </tr>
@@ -428,12 +527,12 @@ function Rules() {
       </div>
 
       <div className="message">
-        <strong>Cierre de pronosticos:</strong> se pueden cargar y modificar hasta un minuto antes del comienzo del
+        <strong>Cierre de pronósticos:</strong> se pueden cargar y modificar hasta un minuto antes del comienzo del
         partido. Una vez cerrado, el partido no permite cambios.
       </div>
 
       <div className="message">
-        <strong>Ejemplo:</strong> si el resultado real es Argentina 2 - 1 Argelia y una persona pronostico 2 - 0,
+        <strong>Ejemplo:</strong> si el resultado real es Argentina 2 - 1 Argelia y una persona pronosticó 2 - 0,
         suma 5 puntos por acertar ganador y 2 puntos por acertar los goles de Argentina.
       </div>
     </div>

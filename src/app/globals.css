@@ -303,6 +303,36 @@ select:disabled {
   margin: 22px 0;
 }
 
+.auth-switch {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 0 0 18px;
+}
+
+.participant-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel-soft);
+  padding: 16px;
+}
+
+.participant-status .section-title {
+  margin-top: 8px;
+}
+
+.participant-status .section-copy {
+  margin-bottom: 0;
+}
+
+.participant-status-empty {
+  background: #fff;
+}
+
 .tab {
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -625,6 +655,11 @@ select:disabled {
 
   .prediction-options {
     grid-template-columns: 1fr;
+  }
+
+  .participant-status {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .score-inputs {

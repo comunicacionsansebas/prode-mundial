@@ -5,7 +5,7 @@ Web app simple para un prode interno de empresa, construida con Next.js, TypeScr
 ## Funcionalidades incluidas
 
 - Pantalla de inicio con logo, nombre del torneo y acceso/registro.
-- Registro por nombre, apellido, email y area opcional.
+- Registro y acceso con email y contrasena mediante Supabase Auth.
 - Fixture agrupado por fecha.
 - Pronosticos por partido con cantidad de goles de cada equipo.
 - Bloqueo automatico de edicion un minuto antes del inicio del partido.
