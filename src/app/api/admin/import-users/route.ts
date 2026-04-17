@@ -142,116 +142,123 @@ async function getAuthUsersByEmail(supabase: SupabaseClient): Promise<Map<string
 }
 
 export async function POST(request: Request) {
-  const { adminPin, csv } = (await request.json()) as { adminPin?: string; csv?: string };
-  const expectedPin = process.env.ADMIN_PIN ?? process.env.NEXT_PUBLIC_ADMIN_PIN ?? "admin123";
+  try {
+    const { adminPin, csv } = (await request.json()) as { adminPin?: string; csv?: string };
+    const expectedPin = process.env.ADMIN_PIN ?? process.env.NEXT_PUBLIC_ADMIN_PIN ?? "admin123";
 
-  if (adminPin !== expectedPin) {
-    return NextResponse.json({ error: "PIN administrador incorrecto." }, { status: 401 });
-  }
+    if (adminPin !== expectedPin) {
+      return NextResponse.json({ error: "PIN administrador incorrecto." }, { status: 401 });
+    }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!supabaseUrl || !serviceRoleKey) {
-    return NextResponse.json(
-      { error: "Falta configurar SUPABASE_SERVICE_ROLE_KEY en las variables de entorno." },
-      { status: 500 },
+    if (!supabaseUrl || !serviceRoleKey) {
+      return NextResponse.json(
+        { error: "Falta configurar SUPABASE_SERVICE_ROLE_KEY en las variables de entorno." },
+        { status: 500 },
+      );
+    }
+
+    const { rows, errors } = parseEmployeesCsv(csv ?? "");
+    if (!rows.length) {
+      return NextResponse.json({ error: errors.join(" ") || "No se encontraron empleados para importar." }, { status: 400 });
+    }
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
+
+    const authUsersByEmail = await getAuthUsersByEmail(supabase);
+    const { data: existingProfiles, error: profilesError } = await supabase
+      .from("users")
+      .select("id,email")
+      .in(
+        "email",
+        rows.map((row) => row.email),
+      );
+
+    if (profilesError) {
+      return NextResponse.json({ error: profilesError.message }, { status: 500 });
+    }
+
+    const profilesByEmail = new Map<string, { id: string; email: string }>(
+      (existingProfiles ?? []).map((profile) => [String(profile.email).toLowerCase(), profile as { id: string; email: string }]),
     );
-  }
 
-  const { rows, errors } = parseEmployeesCsv(csv ?? "");
-  if (!rows.length) {
-    return NextResponse.json({ error: errors.join(" ") || "No se encontraron empleados para importar." }, { status: 400 });
-  }
+    let authCreated = 0;
+    let profilesCreated = 0;
+    let profilesUpdated = 0;
 
-  const supabase = createClient(supabaseUrl, serviceRoleKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
+    for (const row of rows) {
+      try {
+        let authUserId = authUsersByEmail.get(row.email)?.id;
 
-  const authUsersByEmail = await getAuthUsersByEmail(supabase);
-  const { data: existingProfiles, error: profilesError } = await supabase
-    .from("users")
-    .select("id,email")
-    .in(
-      "email",
-      rows.map((row) => row.email),
-    );
+        if (!authUserId) {
+          const { data, error } = await supabase.auth.admin.createUser({
+            email: row.email,
+            password: row.password,
+            email_confirm: true,
+            user_metadata: {
+              firstName: row.firstName,
+              lastName: row.lastName,
+              area: row.area,
+            },
+          });
 
-  if (profilesError) {
-    return NextResponse.json({ error: profilesError.message }, { status: 500 });
-  }
+          if (error || !data.user) {
+            errors.push(`${row.email}: ${error?.message ?? "no se pudo crear el usuario."}`);
+            continue;
+          }
 
-  const profilesByEmail = new Map<string, { id: string; email: string }>(
-    (existingProfiles ?? []).map((profile) => [String(profile.email).toLowerCase(), profile as { id: string; email: string }]),
-  );
+          authUserId = data.user.id;
+          authUsersByEmail.set(row.email, { id: authUserId, email: row.email });
+          authCreated += 1;
+        }
 
-  let authCreated = 0;
-  let profilesCreated = 0;
-  let profilesUpdated = 0;
-
-  for (const row of rows) {
-    try {
-      let authUserId = authUsersByEmail.get(row.email)?.id;
-
-      if (!authUserId) {
-        const { data, error } = await supabase.auth.admin.createUser({
-          email: row.email,
-          password: row.password,
-          email_confirm: true,
-          user_metadata: {
-            firstName: row.firstName,
-            lastName: row.lastName,
-            area: row.area,
+        const existingProfile = profilesByEmail.get(row.email);
+        const profileId = existingProfile?.id ?? authUserId;
+        const { error: profileError } = await supabase.from("users").upsert(
+          {
+            id: profileId,
+            first_name: row.firstName,
+            last_name: row.lastName,
+            email: row.email,
+            area: row.area || null,
           },
-        });
+          { onConflict: "id" },
+        );
 
-        if (error || !data.user) {
-          errors.push(`${row.email}: ${error?.message ?? "no se pudo crear el usuario."}`);
+        if (profileError) {
+          errors.push(`${row.email}: ${profileError.message}`);
           continue;
         }
 
-        authUserId = data.user.id;
-        authUsersByEmail.set(row.email, { id: authUserId, email: row.email });
-        authCreated += 1;
+        if (existingProfile) {
+          profilesUpdated += 1;
+        } else {
+          profilesCreated += 1;
+          profilesByEmail.set(row.email, { id: profileId, email: row.email });
+        }
+      } catch (error) {
+        errors.push(`${row.email}: ${error instanceof Error ? error.message : "error inesperado."}`);
       }
-
-      const existingProfile = profilesByEmail.get(row.email);
-      const profileId = existingProfile?.id ?? authUserId;
-      const { error: profileError } = await supabase.from("users").upsert(
-        {
-          id: profileId,
-          first_name: row.firstName,
-          last_name: row.lastName,
-          email: row.email,
-          area: row.area || null,
-        },
-        { onConflict: "id" },
-      );
-
-      if (profileError) {
-        errors.push(`${row.email}: ${profileError.message}`);
-        continue;
-      }
-
-      if (existingProfile) {
-        profilesUpdated += 1;
-      } else {
-        profilesCreated += 1;
-        profilesByEmail.set(row.email, { id: profileId, email: row.email });
-      }
-    } catch (error) {
-      errors.push(`${row.email}: ${error instanceof Error ? error.message : "error inesperado."}`);
     }
-  }
 
-  return NextResponse.json({
-    authCreated,
-    profilesCreated,
-    profilesUpdated,
-    errors,
-    processed: rows.length,
-  });
+    return NextResponse.json({
+      authCreated,
+      profilesCreated,
+      profilesUpdated,
+      errors,
+      processed: rows.length,
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Error inesperado al importar empleados." },
+      { status: 500 },
+    );
+  }
 }

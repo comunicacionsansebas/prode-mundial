@@ -201,7 +201,8 @@ export default function AdminPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ adminPin: adminPinValue, csv }),
       });
-      const result = (await response.json()) as {
+      const responseText = await response.text();
+      let result: {
         authCreated?: number;
         profilesCreated?: number;
         profilesUpdated?: number;
@@ -209,6 +210,14 @@ export default function AdminPage() {
         errors?: string[];
         error?: string;
       };
+
+      try {
+        result = responseText ? JSON.parse(responseText) : {};
+      } catch {
+        result = {
+          error: responseText || `El servidor respondio con estado ${response.status}, pero no devolvio JSON.`,
+        };
+      }
 
       if (!response.ok) {
         throw new Error(result.error ?? "No se pudo importar el CSV de empleados.");
