@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { calculateStandings, getOutcomeFromScore, getUserName } from "@/lib/scoring";
@@ -166,6 +166,7 @@ function toGoogleSheetsCsvUrl(url: string, gid?: string): string {
 export default function AdminPage() {
   const [data, setData] = useState<AppData | null>(null);
   const [isAllowed, setIsAllowed] = useState(false);
+  const [adminPinValue, setAdminPinValue] = useState("");
   const [message, setMessage] = useState("");
   const standings = useMemo(() => (data ? calculateStandings(data) : []), [data]);
 
@@ -180,10 +181,49 @@ export default function AdminPage() {
     const form = new FormData(event.currentTarget);
     const pin = String(form.get("pin") ?? "");
     if (pin === adminPin) {
+      setAdminPinValue(pin);
       setIsAllowed(true);
       setMessage("Acceso administrador habilitado.");
     } else {
       setMessage("PIN incorrecto.");
+    }
+  }
+
+  async function handleEmployeeImport(csv: string) {
+    if (!csv.trim()) {
+      setMessage("Pegá o subí un CSV de empleados para importar.");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/admin/import-users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adminPin: adminPinValue, csv }),
+      });
+      const result = (await response.json()) as {
+        authCreated?: number;
+        profilesCreated?: number;
+        profilesUpdated?: number;
+        processed?: number;
+        errors?: string[];
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(result.error ?? "No se pudo importar el CSV de empleados.");
+      }
+
+      setData(await getInitialData());
+      setMessage(
+        `Empleados procesados: ${result.processed ?? 0}. Usuarios creados: ${result.authCreated ?? 0}. Perfiles nuevos: ${
+          result.profilesCreated ?? 0
+        }. Perfiles actualizados: ${result.profilesUpdated ?? 0}.${
+          result.errors?.length ? ` Filas con error: ${result.errors.join(" ")}` : ""
+        }`,
+      );
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "No se pudo importar el CSV de empleados.");
     }
   }
 
@@ -345,6 +385,7 @@ export default function AdminPage() {
             </aside>
 
             <section className="stack">
+              <EmployeeImporter onImport={handleEmployeeImport} />
               <BulkResultsImporter onGoogleSheetsImport={handleGoogleSheetsImport} onImport={handleBulkResultsImport} />
               <FixtureImporter onGoogleSheetsImport={handleFixtureGoogleSheetsImport} />
               {data.matches.map((match) => (
@@ -356,6 +397,57 @@ export default function AdminPage() {
       </main>
       <Footer />
     </div>
+  );
+}
+
+function EmployeeImporter({ onImport }: { onImport: (csv: string) => void }) {
+  const [csv, setCsv] = useState("");
+  const example =
+    "nombre,apellido,email,area,password\nAna,Martinez,ana@empresa.com,Marketing,ClaveTemporal123\nLucas,Pereyra,lucas@empresa.com,Producto,ClaveTemporal123";
+
+  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => setCsv(String(reader.result ?? ""));
+    reader.readAsText(file);
+  }
+
+  return (
+    <section className="panel">
+      <div className="panel-content stack">
+        <div>
+          <h2 className="section-title">Importar empleados</h2>
+          <p className="section-copy">
+            Crea usuarios autorizados para ingresar al prode y sus perfiles para el ranking. El CSV puede usar coma o
+            punto y coma como separador.
+          </p>
+        </div>
+        <div className="field">
+          <label htmlFor="employeesFile">Archivo CSV</label>
+          <input accept=".csv,text/csv" id="employeesFile" type="file" onChange={handleFileChange} />
+        </div>
+        <div className="field">
+          <label htmlFor="employeesCsv">CSV de empleados</label>
+          <textarea
+            className="textarea"
+            id="employeesCsv"
+            placeholder={example}
+            rows={7}
+            value={csv}
+            onChange={(event) => setCsv(event.target.value)}
+          />
+        </div>
+        <div className="message">
+          Formato esperado: <strong>nombre, apellido, email, area, password</strong>. Tambien acepta{" "}
+          <strong>contraseña</strong>, <strong>contrasena</strong> o <strong>clave</strong> como columna de password.
+        </div>
+        <button className="button button-primary" type="button" onClick={() => onImport(csv)}>
+          Importar empleados
+        </button>
+      </div>
+    </section>
   );
 }
 

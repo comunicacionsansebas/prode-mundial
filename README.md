@@ -4,8 +4,9 @@ Web app simple para un prode interno de empresa, construida con Next.js, TypeScr
 
 ## Funcionalidades incluidas
 
-- Pantalla de inicio con logo, nombre del torneo y acceso/registro.
-- Registro y acceso con email y contrasena mediante Supabase Auth.
+- Pantalla de inicio con logo, nombre del torneo y acceso de participantes.
+- Acceso con email y contrasena mediante Supabase Auth.
+- Importacion de empleados autorizados desde CSV en el panel admin.
 - Fixture agrupado por fecha.
 - Pronosticos por partido con cantidad de goles de cada equipo.
 - Bloqueo automatico de edicion un minuto antes del inicio del partido.
@@ -50,13 +51,18 @@ http://localhost:3000/admin
 
 ## Variables de entorno
 
-Copiar `.env.example` a `.env.local` si se quiere cambiar el PIN administrador:
+Copiar `.env.example` a `.env.local` y completar las credenciales:
 
 ```bash
+NEXT_PUBLIC_SUPABASE_URL=https://tu-proyecto.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=tu_publishable_key
 NEXT_PUBLIC_ADMIN_PIN=admin123
+SUPABASE_SERVICE_ROLE_KEY=tu_service_role_key_solo_servidor
 ```
 
-Por simplicidad de primera version, el PIN se usa del lado cliente. Para uso productivo con datos reales conviene reemplazarlo por autenticacion corporativa y validaciones del lado servidor.
+`SUPABASE_SERVICE_ROLE_KEY` se usa solo en rutas de servidor para crear empleados desde el CSV. No debe exponerse en el navegador ni llevar prefijo `NEXT_PUBLIC_`.
+
+Por simplicidad de primera version, el PIN tambien se usa para ingresar al panel admin. Para uso productivo con datos reales conviene reemplazarlo por autenticacion corporativa y validaciones mas fuertes del lado servidor.
 
 ## Supabase
 
@@ -81,6 +87,16 @@ Argentina,Argelia,1,1
 ```
 
 Tambien se puede sincronizar desde una Google Sheet publicada como web/CSV usando el campo de URL en el admin.
+
+Para importar empleados autorizados desde `/admin`, usar un CSV con estas columnas:
+
+```csv
+nombre,apellido,email,area,password
+Ana,Martinez,ana@empresa.com,Marketing,ClaveTemporal123
+Lucas,Pereyra,lucas@empresa.com,Producto,ClaveTemporal123
+```
+
+Tambien se aceptan archivos separados por punto y coma y columnas `contraseña`, `contrasena` o `clave` en lugar de `password`.
 
 Para importar nuevos partidos desde Google Sheets, usar una hoja con estas columnas:
 
