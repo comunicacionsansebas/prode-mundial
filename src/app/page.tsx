@@ -6,11 +6,10 @@ import { Header } from "@/components/Header";
 import { Logo } from "@/components/Logo";
 import { calculateStandings, getOutcomeFromScore, getUserName, isMatchClosed, outcomeLabels } from "@/lib/scoring";
 import { getSupabaseClient } from "@/lib/supabase";
-import { clearCurrentUserId, getInitialData, registerUser, upsertPrediction } from "@/lib/storage";
+import { clearCurrentUserId, getInitialData, upsertPrediction } from "@/lib/storage";
 import type { AppData, Match, Prediction, User } from "@/lib/types";
 
 type ActiveTab = "fixture" | "ranking" | "rules";
-type AuthMode = "signIn" | "signUp";
 
 const tournamentName = "Prode Mundial 2026";
 
@@ -36,7 +35,6 @@ export default function HomePage() {
   const [data, setData] = useState<AppData | null>(null);
   const [currentUserId, setCurrentUser] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>("fixture");
-  const [authMode, setAuthMode] = useState<AuthMode>("signIn");
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -65,10 +63,7 @@ export default function HomePage() {
     if (!data) return;
 
     const form = new FormData(event.currentTarget);
-    const firstName = String(form.get("firstName") ?? "").trim();
-    const lastName = String(form.get("lastName") ?? "").trim();
     const email = String(form.get("email") ?? "").trim();
-    const area = String(form.get("area") ?? "").trim();
     const password = String(form.get("password") ?? "");
 
     if (!email || !password) {
@@ -78,63 +73,26 @@ export default function HomePage() {
 
     const supabase = getSupabaseClient();
 
-    if (authMode === "signIn") {
-      const { data: authData, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) {
-        setMessage("No pudimos iniciar sesión. Revisá email y contraseña.");
-        return;
-      }
+    const { data: authData, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      setMessage("No pudimos iniciar sesión. Revisá email y contraseña.");
+      return;
+    }
 
-      const nextData = await getInitialData();
-      const user = nextData.users.find((item) => item.email.toLowerCase() === authData.user.email?.toLowerCase());
-      if (!user) {
-        setData(nextData);
-        setMessage("Tu acceso existe, pero falta crear el perfil del prode. Usá Crear cuenta una vez.");
-        setAuthMode("signUp");
-        return;
-      }
-
+    const nextData = await getInitialData();
+    const user = nextData.users.find((item) => item.email.toLowerCase() === authData.user.email?.toLowerCase());
+    if (!user) {
+      await supabase.auth.signOut();
       setData(nextData);
-      setCurrentUser(user.id);
-      setMessage(`Listo, ${user.firstName}. Ya podés cargar tus pronosticos.`);
-      setActiveTab("fixture");
-      return;
-    }
-
-    if (!firstName || !lastName) {
-      setMessage("Completá nombre, apellido, email y contraseña para crear la cuenta.");
-      return;
-    }
-
-    const { data: authData, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          firstName,
-          lastName,
-          area,
-        },
-      },
-    });
-
-    if (error || !authData.user) {
-      setMessage(error?.message ?? "No pudimos crear la cuenta.");
-      return;
-    }
-
-    const result = await registerUser(data, { firstName, lastName, email, area }, authData.user.id);
-    setData(result.data);
-
-    if (authData.session) {
-      setCurrentUser(result.user.id);
-      setMessage(`Listo, ${result.user.firstName}. Ya podés cargar tus pronosticos.`);
-      setActiveTab("fixture");
-    } else {
       setCurrentUser(null);
-      setMessage("Cuenta creada. Revisá tu email para confirmar el acceso antes de ingresar.");
-      setAuthMode("signIn");
+      setMessage("Tu email tiene acceso, pero todavía falta cargar tu perfil del prode. Avisale al administrador.");
+      return;
     }
+
+    setData(nextData);
+    setCurrentUser(user.id);
+    setMessage(`Listo, ${user.firstName}. Ya podés cargar tus pronosticos.`);
+    setActiveTab("fixture");
   }
 
   async function handlePrediction(match: Match, homeScore: number, awayScore: number) {
@@ -153,7 +111,6 @@ export default function HomePage() {
     await getSupabaseClient().auth.signOut();
     clearCurrentUserId();
     setCurrentUser(null);
-    setAuthMode("signIn");
     setMessage("Sesión cerrada. Ingresá con email y contraseña para jugar.");
   }
 
@@ -188,60 +145,28 @@ export default function HomePage() {
           <section className="panel" aria-labelledby="register-title">
             <div className="panel-content">
               <h2 className="section-title" id="register-title">
-                Registro / acceso
+                Acceso de participantes
               </h2>
-              <p className="section-copy">Ingresá con tu email y contraseña para cargar tus pronósticos.</p>
-              <div className="auth-switch" aria-label="Modo de acceso">
-                <button
-                  className={`tab ${authMode === "signIn" ? "tab-active" : ""}`}
-                  type="button"
-                  onClick={() => setAuthMode("signIn")}
-                >
-                  Ingresar
-                </button>
-                <button
-                  className={`tab ${authMode === "signUp" ? "tab-active" : ""}`}
-                  type="button"
-                  onClick={() => setAuthMode("signUp")}
-                >
-                  Crear cuenta
-                </button>
-              </div>
+              <p className="section-copy">
+                Ingresá con el email y la contraseña asignados por la empresa.
+              </p>
               <form className="stack" onSubmit={handleAuth}>
-                {authMode === "signUp" ? (
-                  <div className="grid-two">
-                    <div className="field">
-                      <label htmlFor="firstName">Nombre</label>
-                      <input id="firstName" name="firstName" autoComplete="given-name" required />
-                    </div>
-                    <div className="field">
-                      <label htmlFor="lastName">Apellido</label>
-                      <input id="lastName" name="lastName" autoComplete="family-name" required />
-                    </div>
-                  </div>
-                ) : null}
                 <div className="field">
                   <label htmlFor="email">Email</label>
                   <input id="email" name="email" type="email" autoComplete="email" required />
                 </div>
-                {authMode === "signUp" ? (
-                  <div className="field">
-                    <label htmlFor="area">Area / equipo / sector opcional</label>
-                    <input id="area" name="area" />
-                  </div>
-                ) : null}
                 <div className="field">
                   <label htmlFor="password">Contraseña</label>
                   <input
                     id="password"
                     name="password"
                     type="password"
-                    autoComplete={authMode === "signIn" ? "current-password" : "new-password"}
+                    autoComplete="current-password"
                     required
                   />
                 </div>
                 <button className="button button-primary" type="submit">
-                  {authMode === "signIn" ? "Ingresar" : "Crear cuenta"}
+                  Ingresar
                 </button>
               </form>
             </div>
@@ -297,7 +222,7 @@ function ParticipantStatus({
         <div>
           <h2 className="section-title">Ingresá para jugar</h2>
           <p className="section-copy">
-            Creá tu cuenta o iniciá sesión para cargar y modificar tus pronósticos.
+            Usá el email y la contraseña asignados por la empresa para cargar y modificar tus pronósticos.
           </p>
         </div>
       </div>
