@@ -6,9 +6,9 @@ export const metadata: Metadata = {
   title: "Prode Mundial Interno",
   description: "Prode interno de la empresa para el Mundial.",
   icons: {
-    icon: "/favicon.svg",
-    shortcut: "/favicon.svg",
-    apple: "/favicon.svg",
+    icon: "/favicon.png",
+    shortcut: "/favicon.png",
+    apple: "/favicon.png",
   },
 };
 
