@@ -361,6 +361,27 @@ select:disabled {
   padding: 16px;
 }
 
+.participant-card {
+  display: grid;
+  gap: 12px;
+}
+
+.participant-actions,
+.password-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.password-panel {
+  border: 1px solid #cde6df;
+  border-radius: var(--radius);
+  display: grid;
+  gap: 14px;
+  background: #fbfffe;
+  padding: 16px;
+}
+
 .participant-status .section-title {
   margin-top: 8px;
 }
@@ -707,6 +728,16 @@ select:disabled {
   .participant-status {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .participant-actions,
+  .password-actions {
+    width: 100%;
+  }
+
+  .participant-actions .button,
+  .password-actions .button {
+    flex: 1 1 180px;
   }
 
   .score-inputs {

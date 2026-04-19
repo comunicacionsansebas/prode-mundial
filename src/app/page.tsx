@@ -115,6 +115,22 @@ export default function HomePage() {
     setMessage("Sesión cerrada. Ingresá con email y contraseña para jugar.");
   }
 
+  async function handlePasswordChange(newPassword: string): Promise<boolean> {
+    if (newPassword.length < 6) {
+      setMessage("La nueva contraseña debe tener al menos 6 caracteres.");
+      return false;
+    }
+
+    const { error } = await getSupabaseClient().auth.updateUser({ password: newPassword });
+    if (error) {
+      setMessage("No pudimos cambiar la contraseña. Intentá nuevamente.");
+      return false;
+    }
+
+    setMessage("Contraseña actualizada correctamente.");
+    return true;
+  }
+
   if (!data) {
     return (
       <div className="app-shell">
@@ -178,7 +194,11 @@ export default function HomePage() {
 
         <section className="panel">
           <div className="panel-content">
-            <ParticipantStatus currentUser={currentUser} onSignOut={handleSignOut} />
+            <ParticipantStatus
+              currentUser={currentUser}
+              onPasswordChange={handlePasswordChange}
+              onSignOut={handleSignOut}
+            />
 
             <div className="tabs" role="tablist" aria-label="Secciones del prode">
               {[
@@ -212,11 +232,16 @@ export default function HomePage() {
 
 function ParticipantStatus({
   currentUser,
+  onPasswordChange,
   onSignOut,
 }: {
   currentUser: User | null;
+  onPasswordChange: (newPassword: string) => Promise<boolean>;
   onSignOut: () => void;
 }) {
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState("");
+
   if (!currentUser) {
     return (
       <div className="participant-status participant-status-empty">
@@ -230,19 +255,81 @@ function ParticipantStatus({
     );
   }
 
+  async function handlePasswordSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const newPassword = String(form.get("newPassword") ?? "");
+    const repeatPassword = String(form.get("repeatPassword") ?? "");
+
+    if (newPassword.length < 6) {
+      setPasswordMessage("La contraseña debe tener al menos 6 caracteres.");
+      return;
+    }
+
+    if (newPassword !== repeatPassword) {
+      setPasswordMessage("Las contraseñas no coinciden.");
+      return;
+    }
+
+    const wasChanged = await onPasswordChange(newPassword);
+    if (wasChanged) {
+      event.currentTarget.reset();
+      setPasswordMessage("Contraseña cambiada correctamente.");
+      setIsChangingPassword(false);
+    }
+  }
+
   return (
-    <div className="participant-status">
-      <div>
-        <span className="badge badge-ok">Participante activo</span>
-        <h2 className="section-title">{getUserName(currentUser)}</h2>
-        <p className="section-copy">
-          {currentUser.area ? `${currentUser.area} · ` : ""}
-          {currentUser.email}
-        </p>
+    <div className="participant-card">
+      <div className="participant-status">
+        <div>
+          <span className="badge badge-ok">Participante activo</span>
+          <h2 className="section-title">{getUserName(currentUser)}</h2>
+          <p className="section-copy">
+            {currentUser.area ? `${currentUser.area} · ` : ""}
+            {currentUser.email}
+          </p>
+        </div>
+        <div className="participant-actions">
+          <button
+            className="button button-secondary"
+            type="button"
+            onClick={() => {
+              setIsChangingPassword((value) => !value);
+              setPasswordMessage("");
+            }}
+          >
+            Cambiar contraseña
+          </button>
+          <button className="button button-secondary" type="button" onClick={onSignOut}>
+            Cerrar sesión
+          </button>
+        </div>
       </div>
-      <button className="button button-secondary" type="button" onClick={onSignOut}>
-        Cerrar sesión
-      </button>
+      {isChangingPassword ? (
+        <form className="password-panel" onSubmit={handlePasswordSubmit}>
+          <div className="grid-two">
+            <div className="field">
+              <label htmlFor="newPassword">Nueva contraseña</label>
+              <input id="newPassword" name="newPassword" type="password" autoComplete="new-password" required />
+            </div>
+            <div className="field">
+              <label htmlFor="repeatPassword">Repetir contraseña</label>
+              <input id="repeatPassword" name="repeatPassword" type="password" autoComplete="new-password" required />
+            </div>
+          </div>
+          <div className="password-actions">
+            <button className="button button-primary" type="submit">
+              Guardar nueva contraseña
+            </button>
+            <button className="button button-secondary" type="button" onClick={() => setIsChangingPassword(false)}>
+              Cancelar
+            </button>
+          </div>
+          {passwordMessage ? <p className="save-feedback">{passwordMessage}</p> : null}
+        </form>
+      ) : null}
+      {!isChangingPassword && passwordMessage ? <p className="save-feedback">{passwordMessage}</p> : null}
     </div>
   );
 }
