@@ -1,6 +1,7 @@
 "use client";
 
 import { demoData } from "./demoData";
+import { argentinaLeagueFixtures } from "./argentinaLeagueFixtures";
 import { groupStageFixtures } from "./groupStageFixtures";
 import type { AppData, Match, MatchOutcome, Prediction, User } from "./types";
 
@@ -303,17 +304,25 @@ export async function addDemoMatches(_data: AppData): Promise<AppData> {
   return getInitialData();
 }
 
-export async function loadGroupStageFixtures(): Promise<AppData> {
+async function replaceFixtures(matches: Match[]): Promise<AppData> {
   await request<void>("predictions?id=not.is.null", { method: "DELETE" });
   await request<void>("results?match_id=not.is.null", { method: "DELETE" });
   await request<void>("matches?id=not.is.null", { method: "DELETE" });
 
   await request<DbMatch[]>("matches", {
     method: "POST",
-    body: JSON.stringify(groupStageFixtures.map(toDbMatch)),
+    body: JSON.stringify(matches.map(toDbMatch)),
   });
 
   return getInitialData();
+}
+
+export async function loadGroupStageFixtures(): Promise<AppData> {
+  return replaceFixtures(groupStageFixtures);
+}
+
+export async function loadArgentinaLeagueFixtures(): Promise<AppData> {
+  return replaceFixtures(argentinaLeagueFixtures);
 }
 
 export async function resetDemoData(): Promise<AppData> {

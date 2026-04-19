@@ -1,0 +1,68 @@
+import type { Match } from "./types";
+
+export const argentinaLeagueFixtures: Match[] = [
+  {
+    id: "lp-arg-2026-04-25-001",
+    dateLabel: "Sabado 25 de abril - Liga Profesional Argentina",
+    dateVisible: true,
+    startsAt: "2026-04-25T17:00:00.000Z",
+    homeTeam: "Platense",
+    awayTeam: "San Lorenzo",
+  },
+  {
+    id: "lp-arg-2026-04-25-002",
+    dateLabel: "Sabado 25 de abril - Liga Profesional Argentina",
+    dateVisible: true,
+    startsAt: "2026-04-25T20:00:00.000Z",
+    homeTeam: "Estudiantes",
+    awayTeam: "Talleres de Cordoba",
+  },
+  {
+    id: "lp-arg-2026-04-25-003",
+    dateLabel: "Sabado 25 de abril - Liga Profesional Argentina",
+    dateVisible: true,
+    startsAt: "2026-04-25T22:15:00.000Z",
+    homeTeam: "Sarmiento",
+    awayTeam: "Tigre",
+  },
+  {
+    id: "lp-arg-2026-04-25-004",
+    dateLabel: "Sabado 25 de abril - Liga Profesional Argentina",
+    dateVisible: true,
+    startsAt: "2026-04-26T00:30:00.000Z",
+    homeTeam: "River Plate",
+    awayTeam: "Aldosivi",
+  },
+  {
+    id: "lp-arg-2026-04-26-001",
+    dateLabel: "Domingo 26 de abril - Liga Profesional Argentina",
+    dateVisible: true,
+    startsAt: "2026-04-26T18:00:00.000Z",
+    homeTeam: "Independiente Rivadavia",
+    awayTeam: "Gimnasia Mendoza",
+  },
+  {
+    id: "lp-arg-2026-04-26-002",
+    dateLabel: "Domingo 26 de abril - Liga Profesional Argentina",
+    dateVisible: true,
+    startsAt: "2026-04-26T20:30:00.000Z",
+    homeTeam: "Newell's Old Boys",
+    awayTeam: "Instituto",
+  },
+  {
+    id: "lp-arg-2026-04-26-003",
+    dateLabel: "Domingo 26 de abril - Liga Profesional Argentina",
+    dateVisible: true,
+    startsAt: "2026-04-26T20:30:00.000Z",
+    homeTeam: "Belgrano",
+    awayTeam: "Gimnasia La Plata",
+  },
+  {
+    id: "lp-arg-2026-04-26-004",
+    dateLabel: "Domingo 26 de abril - Liga Profesional Argentina",
+    dateVisible: true,
+    startsAt: "2026-04-26T23:00:00.000Z",
+    homeTeam: "Atletico Tucuman",
+    awayTeam: "Banfield",
+  },
+];

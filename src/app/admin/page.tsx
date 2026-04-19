@@ -6,6 +6,7 @@ import { Header } from "@/components/Header";
 import { calculateStandings, getOutcomeFromScore, getUserName } from "@/lib/scoring";
 import {
   getInitialData,
+  loadArgentinaLeagueFixtures,
   loadGroupStageFixtures,
   updateMatch,
   updateMatchResults,
@@ -241,6 +242,11 @@ export default function AdminPage() {
     setMessage("Fase de grupos del Mundial 2026 cargada. Se limpiaron resultados y pronosticos anteriores.");
   }
 
+  async function handleLoadArgentinaLeagueFixtures() {
+    setData(await loadArgentinaLeagueFixtures());
+    setMessage("Liga Profesional Argentina cargada para prueba. Se limpiaron resultados y pronosticos anteriores.");
+  }
+
   async function handleMatchSave(match: Match) {
     if (!data) return;
     setData(await updateMatch(data, match));
@@ -367,6 +373,13 @@ export default function AdminPage() {
                 <button className="button button-primary" type="button" onClick={handleLoadGroupStageFixtures}>
                   Cargar fase de grupos Mundial 2026
                 </button>
+                <button className="button button-soft" type="button" onClick={handleLoadArgentinaLeagueFixtures}>
+                  Liga Profesional Argentina
+                </button>
+                <div className="message">
+                  Los botones de carga reemplazan el fixture visible y limpian pronosticos/resultados. Los usuarios se
+                  conservan. Para volver al Mundial, cargá nuevamente la fase de grupos.
+                </div>
                 <div className="message">
                   Los puntajes se recalculan al guardar resultados. Desempate: mayor cantidad de aciertos.
                 </div>
