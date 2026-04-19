@@ -246,7 +246,18 @@ function ParticipantStatus({
         <div>
           <h2 className="section-title">Ingresá para jugar</h2>
           <p className="section-copy">
-            Usá el email y la contraseña asignados por la empresa para cargar y modificar tus pronósticos.
+            Usá el email y la contraseña asignados por la empresa. Te recomendamos cambiar tu contraseña al ingresar
+            por primera vez.
+          </p>
+          <ul className="intro-list">
+            <li>Acá vas a poder cargar tus pronósticos para el Mundial 2026.</li>
+            <li>Elegí el resultado de cada partido y tocá Guardar pronóstico.</li>
+            <li>Podés modificar tus pronósticos hasta un minuto antes del comienzo del partido.</li>
+            <li>Una vez iniciado el partido, el pronóstico queda cerrado.</li>
+            <li>En la sección Reglas podés consultar cómo funciona el sistema de puntos.</li>
+          </ul>
+          <p className="section-copy">
+            Este prode es una competencia sana y una forma de compartir el Mundial con todo el equipo de San Sebas.
           </p>
         </div>
       </div>
