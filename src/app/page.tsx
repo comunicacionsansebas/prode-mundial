@@ -135,8 +135,13 @@ export default function HomePage() {
           <div className="hero-main">
             <div>
               <Logo size="large" />
+              <span className="hero-kicker">Mundial 2026</span>
               <h1 id="hero-title">{tournamentName}</h1>
-              <p>Un prode interno simple, claro y listo para seguir el Mundial entre equipos de la empresa.</p>
+              <p>¡Bienvenidos al prode mundial 2026 para los empleados del Barrio San Sebastián!</p>
+            </div>
+            <div className="hero-year" aria-hidden="true">
+              <span>20</span>
+              <span>26</span>
             </div>
             <button className="button button-secondary" type="button" onClick={() => setActiveTab("fixture")}>
               Ingresar al prode

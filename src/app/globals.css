@@ -4,10 +4,10 @@
   --muted: #657084;
   --line: #dce3ee;
   --panel: #ffffff;
-  --panel-soft: #eef4ff;
-  --primary: #0f5f8f;
-  --primary-dark: #0a456b;
-  --accent: #2f9e85;
+  --panel-soft: #eef7f5;
+  --primary: #385542;
+  --primary-dark: #263b2e;
+  --accent: #86c8bc;
   --danger: #b42318;
   --warning: #a15c07;
   --radius: 8px;
@@ -157,31 +157,38 @@ select:disabled {
 
 .hero-main {
   background:
-    linear-gradient(135deg, rgba(15, 95, 143, 0.96), rgba(47, 158, 133, 0.9)),
-    #0f5f8f;
+    radial-gradient(circle at 88% 16%, rgba(255, 255, 255, 0.18), transparent 28%),
+    linear-gradient(135deg, #385542 0%, #2f6d61 54%, #86c8bc 140%);
   color: #fff;
   border-radius: var(--radius);
-  min-height: 280px;
+  min-height: 360px;
   padding: clamp(24px, 5vw, 44px);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   box-shadow: var(--shadow);
+  overflow: hidden;
+  position: relative;
 }
 
 .hero-main h1 {
-  margin: 16px 0 10px;
+  margin: 12px 0 10px;
   max-width: 720px;
   font-size: clamp(34px, 6vw, 64px);
   line-height: 0.98;
   letter-spacing: 0;
+  position: relative;
+  z-index: 1;
 }
 
 .hero-main p {
   margin: 0;
-  color: rgba(255, 255, 255, 0.86);
+  color: rgba(255, 255, 255, 0.9);
   font-size: 18px;
-  max-width: 620px;
+  max-width: 600px;
+  line-height: 1.35;
+  position: relative;
+  z-index: 1;
 }
 
 .hero-logo {
@@ -191,6 +198,44 @@ select:disabled {
   background: rgba(255, 255, 255, 0.96);
   color: var(--primary);
   padding: 14px 18px;
+  position: relative;
+  z-index: 1;
+}
+
+.hero-kicker {
+  width: fit-content;
+  margin-top: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  border-radius: 999px;
+  display: inline-flex;
+  padding: 7px 13px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  position: relative;
+  z-index: 1;
+}
+
+.hero-year {
+  position: absolute;
+  right: clamp(18px, 4vw, 42px);
+  bottom: 34px;
+  display: grid;
+  gap: 0;
+  color: rgba(255, 255, 255, 0.1);
+  font-size: clamp(86px, 14vw, 148px);
+  font-weight: 950;
+  line-height: 0.74;
+  letter-spacing: 0;
+  pointer-events: none;
+}
+
+.hero-main .button {
+  position: relative;
+  z-index: 1;
 }
 
 .panel {
@@ -248,7 +293,7 @@ select:disabled {
 .field select:focus,
 .textarea:focus {
   border-color: var(--primary);
-  outline: 3px solid rgba(15, 95, 143, 0.16);
+  outline: 3px solid rgba(134, 200, 188, 0.34);
 }
 
 .textarea {
@@ -445,7 +490,7 @@ select:disabled {
 
 .prediction-option-selected {
   border-color: var(--primary);
-  background: #e8f4fb;
+  background: #eef7f5;
   color: var(--primary-dark);
 }
 
@@ -484,7 +529,7 @@ select:disabled {
 
 .score-field input:focus {
   border-color: var(--primary);
-  outline: 3px solid rgba(15, 95, 143, 0.16);
+  outline: 3px solid rgba(134, 200, 188, 0.34);
 }
 
 .score-separator {
@@ -669,6 +714,13 @@ select:disabled {
     min-height: 360px;
   }
 
+  .hero-year {
+    right: 16px;
+    bottom: 72px;
+    font-size: 76px;
+    opacity: 0.8;
+  }
+
   .prediction-options {
     grid-template-columns: 1fr;
   }
@@ -728,5 +780,9 @@ select:disabled {
 
   .hero-main {
     padding: 22px;
+  }
+
+  .hero-logo {
+    height: 86px;
   }
 }
