@@ -117,17 +117,14 @@ export default function HomePage() {
 
   async function handlePasswordChange(newPassword: string): Promise<boolean> {
     if (newPassword.length < 6) {
-      setMessage("La nueva contraseña debe tener al menos 6 caracteres.");
       return false;
     }
 
     const { error } = await getSupabaseClient().auth.updateUser({ password: newPassword });
     if (error) {
-      setMessage("No pudimos cambiar la contraseña. Intentá nuevamente.");
       return false;
     }
 
-    setMessage("Contraseña actualizada correctamente.");
     return true;
   }
 
@@ -241,6 +238,7 @@ function ParticipantStatus({
 }) {
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState("");
+  const [passwordStatus, setPasswordStatus] = useState<"idle" | "saving" | "saved">("idle");
 
   if (!currentUser) {
     return (
@@ -263,19 +261,39 @@ function ParticipantStatus({
 
     if (newPassword.length < 6) {
       setPasswordMessage("La contraseña debe tener al menos 6 caracteres.");
+      setPasswordStatus("idle");
       return;
     }
 
     if (newPassword !== repeatPassword) {
       setPasswordMessage("Las contraseñas no coinciden.");
+      setPasswordStatus("idle");
       return;
     }
 
+    setPasswordStatus("saving");
+    setPasswordMessage("");
     const wasChanged = await onPasswordChange(newPassword);
     if (wasChanged) {
       event.currentTarget.reset();
       setPasswordMessage("Contraseña cambiada correctamente.");
-      setIsChangingPassword(false);
+      setPasswordStatus("saved");
+    } else {
+      setPasswordMessage("No pudimos cambiar la contraseña. Intentá nuevamente.");
+      setPasswordStatus("idle");
+    }
+  }
+
+  function resetPasswordEdition() {
+    setIsChangingPassword(false);
+    setPasswordMessage("");
+    setPasswordStatus("idle");
+  }
+
+  function handlePasswordInputChange() {
+    if (passwordStatus !== "idle") {
+      setPasswordStatus("idle");
+      setPasswordMessage("");
     }
   }
 
@@ -297,6 +315,7 @@ function ParticipantStatus({
             onClick={() => {
               setIsChangingPassword((value) => !value);
               setPasswordMessage("");
+              setPasswordStatus("idle");
             }}
           >
             Cambiar contraseña
@@ -311,18 +330,36 @@ function ParticipantStatus({
           <div className="grid-two">
             <div className="field">
               <label htmlFor="newPassword">Nueva contraseña</label>
-              <input id="newPassword" name="newPassword" type="password" autoComplete="new-password" required />
+              <input
+                id="newPassword"
+                name="newPassword"
+                type="password"
+                autoComplete="new-password"
+                onChange={handlePasswordInputChange}
+                required
+              />
             </div>
             <div className="field">
               <label htmlFor="repeatPassword">Repetir contraseña</label>
-              <input id="repeatPassword" name="repeatPassword" type="password" autoComplete="new-password" required />
+              <input
+                id="repeatPassword"
+                name="repeatPassword"
+                type="password"
+                autoComplete="new-password"
+                onChange={handlePasswordInputChange}
+                required
+              />
             </div>
           </div>
           <div className="password-actions">
-            <button className="button button-primary" type="submit">
-              Guardar nueva contraseña
+            <button
+              className={`button button-primary ${passwordStatus === "saved" ? "button-saved" : ""}`}
+              disabled={passwordStatus === "saving" || passwordStatus === "saved"}
+              type="submit"
+            >
+              {passwordStatus === "saving" ? "Guardando..." : passwordStatus === "saved" ? "Guardado" : "Guardar nueva contraseña"}
             </button>
-            <button className="button button-secondary" type="button" onClick={() => setIsChangingPassword(false)}>
+            <button className="button button-secondary" type="button" onClick={resetPasswordEdition}>
               Cancelar
             </button>
           </div>
