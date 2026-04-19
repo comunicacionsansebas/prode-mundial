@@ -219,20 +219,6 @@ select:disabled {
   z-index: 1;
 }
 
-.hero-year {
-  position: absolute;
-  right: clamp(18px, 4vw, 42px);
-  bottom: 34px;
-  display: grid;
-  gap: 0;
-  color: rgba(255, 255, 255, 0.1);
-  font-size: clamp(86px, 14vw, 148px);
-  font-weight: 950;
-  line-height: 0.74;
-  letter-spacing: 0;
-  pointer-events: none;
-}
-
 .hero-main .button {
   position: relative;
   z-index: 1;
@@ -712,13 +698,6 @@ select:disabled {
 
   .hero-main {
     min-height: 360px;
-  }
-
-  .hero-year {
-    right: 16px;
-    bottom: 72px;
-    font-size: 76px;
-    opacity: 0.8;
   }
 
   .prediction-options {
