@@ -278,6 +278,15 @@ select:disabled {
   background: var(--primary-dark);
 }
 
+.button-saved,
+.button-saved:hover,
+.button-saved:disabled {
+  background: #0b684e;
+  border-color: #0b684e;
+  color: #fff;
+  opacity: 1;
+}
+
 .button-secondary {
   background: #fff;
   color: var(--foreground);
@@ -493,6 +502,13 @@ select:disabled {
   justify-content: space-between;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.save-feedback {
+  margin: -2px 0 0;
+  color: #0b684e;
+  font-size: 0.92rem;
+  font-weight: 700;
 }
 
 .rules-section {

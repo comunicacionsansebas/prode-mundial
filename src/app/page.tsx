@@ -95,16 +95,17 @@ export default function HomePage() {
     setActiveTab("fixture");
   }
 
-  async function handlePrediction(match: Match, homeScore: number, awayScore: number) {
-    if (!data || !currentUser) return;
+  async function handlePrediction(match: Match, homeScore: number, awayScore: number): Promise<boolean> {
+    if (!data || !currentUser) return false;
 
     if (isMatchClosed(match)) {
       setMessage("Este partido ya cerró. Los pronósticos se pueden editar hasta un minuto antes del inicio.");
-      return;
+      return false;
     }
 
     setData(await upsertPrediction(data, currentUser.id, match.id, homeScore, awayScore));
     setMessage("Pronóstico guardado.");
+    return true;
   }
 
   async function handleSignOut() {
@@ -253,7 +254,7 @@ function Fixture({
 }: {
   data: AppData;
   currentUser: User | null;
-  onPredict: (match: Match, homeScore: number, awayScore: number) => void;
+  onPredict: (match: Match, homeScore: number, awayScore: number) => Promise<boolean>;
 }) {
   const groups = groupMatches(data.matches);
 
@@ -317,11 +318,12 @@ function PredictionScoreForm({
   closed: boolean;
   currentUser: User | null;
   match: Match;
-  onPredict: (match: Match, homeScore: number, awayScore: number) => void;
+  onPredict: (match: Match, homeScore: number, awayScore: number) => Promise<boolean>;
   prediction?: Prediction;
 }) {
   const [homeScore, setHomeScore] = useState(prediction?.homeScore?.toString() ?? "");
   const [awayScore, setAwayScore] = useState(prediction?.awayScore?.toString() ?? "");
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
 
   useEffect(() => {
     setHomeScore(prediction?.homeScore?.toString() ?? "");
@@ -337,19 +339,27 @@ function PredictionScoreForm({
     Number.isInteger(parsedAwayScore) &&
     parsedHomeScore >= 0 &&
     parsedAwayScore >= 0;
-  const canSave = Boolean(currentUser && !closed && hasValidScores);
+  const canSave = Boolean(currentUser && !closed && hasValidScores && saveStatus !== "saving" && saveStatus !== "saved");
   const previewOutcome =
     hasValidScores
       ? outcomeLabels[getOutcomeFromScore(parsedHomeScore, parsedAwayScore)]
       : "Completá ambos goles";
+  const buttonLabel = saveStatus === "saving" ? "Guardando..." : saveStatus === "saved" ? "Guardado" : "Guardar pronóstico";
+
+  function handleScoreChange(setScore: (value: string) => void, value: string) {
+    setScore(value);
+    setSaveStatus("idle");
+  }
 
   return (
     <form
       className="score-form"
-      onSubmit={(event) => {
+      onSubmit={async (event) => {
         event.preventDefault();
         if (!canSave || parsedHomeScore === null || parsedAwayScore === null) return;
-        onPredict(match, parsedHomeScore, parsedAwayScore);
+        setSaveStatus("saving");
+        const wasSaved = await onPredict(match, parsedHomeScore, parsedAwayScore);
+        setSaveStatus(wasSaved ? "saved" : "idle");
       }}
     >
       <div className="score-inputs">
@@ -361,7 +371,7 @@ function PredictionScoreForm({
             step="1"
             type="number"
             value={homeScore}
-            onChange={(event) => setHomeScore(event.target.value)}
+            onChange={(event) => handleScoreChange(setHomeScore, event.target.value)}
           />
         </label>
         <span className="score-separator">-</span>
@@ -373,16 +383,21 @@ function PredictionScoreForm({
             step="1"
             type="number"
             value={awayScore}
-            onChange={(event) => setAwayScore(event.target.value)}
+            onChange={(event) => handleScoreChange(setAwayScore, event.target.value)}
           />
         </label>
       </div>
       <div className="score-actions">
         <span className="badge">{previewOutcome}</span>
-        <button className="button button-primary" disabled={!canSave} type="submit">
-          Guardar pronóstico
+        <button className={`button button-primary ${saveStatus === "saved" ? "button-saved" : ""}`} disabled={!canSave} type="submit">
+          {buttonLabel}
         </button>
       </div>
+      {saveStatus === "saved" ? (
+        <p className="save-feedback" role="status">
+          Cambios guardados para este partido.
+        </p>
+      ) : null}
     </form>
   );
 }
