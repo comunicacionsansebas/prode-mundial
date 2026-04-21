@@ -144,7 +144,7 @@ export default function HomePage() {
     <div className="app-shell">
       <Header />
       <main className="page">
-        <section className="hero" aria-labelledby="hero-title">
+        <section className={`hero ${currentUser ? "hero-authenticated" : ""}`} aria-labelledby="hero-title">
           <div className="hero-main">
             <div>
               <span className="hero-kicker">Mundial 2026</span>
@@ -156,35 +156,37 @@ export default function HomePage() {
             </button>
           </div>
 
-          <section className="panel" aria-labelledby="register-title">
-            <div className="panel-content">
-              <h2 className="section-title" id="register-title">
-                Acceso de participantes
-              </h2>
-              <p className="section-copy">
-                Ingresá con el email y la contraseña asignados por la empresa.
-              </p>
-              <form className="stack" onSubmit={handleAuth}>
-                <div className="field">
-                  <label htmlFor="email">Email</label>
-                  <input id="email" name="email" type="email" autoComplete="email" required />
-                </div>
-                <div className="field">
-                  <label htmlFor="password">Contraseña</label>
-                  <input
-                    id="password"
-                    name="password"
-                    type="password"
-                    autoComplete="current-password"
-                    required
-                  />
-                </div>
-                <button className="button button-primary" type="submit">
-                  Ingresar
-                </button>
-              </form>
-            </div>
-          </section>
+          {!currentUser ? (
+            <section className="panel" aria-labelledby="register-title">
+              <div className="panel-content">
+                <h2 className="section-title" id="register-title">
+                  Acceso de participantes
+                </h2>
+                <p className="section-copy">
+                  Ingresá con el email y la contraseña asignados por la empresa.
+                </p>
+                <form className="stack" onSubmit={handleAuth}>
+                  <div className="field">
+                    <label htmlFor="email">Email</label>
+                    <input id="email" name="email" type="email" autoComplete="email" required />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="password">Contraseña</label>
+                    <input
+                      id="password"
+                      name="password"
+                      type="password"
+                      autoComplete="current-password"
+                      required
+                    />
+                  </div>
+                  <button className="button button-primary" type="submit">
+                    Ingresar
+                  </button>
+                </form>
+              </div>
+            </section>
+          ) : null}
         </section>
 
         {message ? <div className="message message-success">{message}</div> : null}

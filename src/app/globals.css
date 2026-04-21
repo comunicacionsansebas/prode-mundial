@@ -155,6 +155,10 @@ select:disabled {
   margin-bottom: 24px;
 }
 
+.hero-authenticated {
+  grid-template-columns: 1fr;
+}
+
 .hero-main {
   background:
     radial-gradient(circle at 88% 16%, rgba(255, 255, 255, 0.18), transparent 28%),
