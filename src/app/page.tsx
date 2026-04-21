@@ -34,6 +34,7 @@ function groupMatches(matches: Match[]): Array<[string, Match[]]> {
 export default function HomePage() {
   const [data, setData] = useState<AppData | null>(null);
   const [currentUserId, setCurrentUser] = useState<string | null>(null);
+  const [hasChangedPassword, setHasChangedPassword] = useState(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>("fixture");
   const [message, setMessage] = useState("");
 
@@ -45,6 +46,7 @@ export default function HomePage() {
       const sessionUser = initialData.users.find((user) => user.email.toLowerCase() === sessionEmail);
       setData(initialData);
       setCurrentUser(sessionUser?.id ?? null);
+      setHasChangedPassword(Boolean(sessionData.session?.user.user_metadata?.passwordChanged));
     }
 
     loadData().catch(() => {
@@ -91,6 +93,7 @@ export default function HomePage() {
 
     setData(nextData);
     setCurrentUser(user.id);
+    setHasChangedPassword(Boolean(authData.user.user_metadata?.passwordChanged));
     setMessage(`Listo, ${user.firstName}. Ya podés cargar tus pronosticos.`);
     setActiveTab("fixture");
   }
@@ -112,6 +115,7 @@ export default function HomePage() {
     await getSupabaseClient().auth.signOut();
     clearCurrentUserId();
     setCurrentUser(null);
+    setHasChangedPassword(false);
     setMessage("Sesión cerrada. Ingresá con email y contraseña para jugar.");
   }
 
@@ -120,11 +124,20 @@ export default function HomePage() {
       return false;
     }
 
-    const { error } = await getSupabaseClient().auth.updateUser({ password: newPassword });
+    const supabase = getSupabaseClient();
+    const { data: userData } = await supabase.auth.getUser();
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword,
+      data: {
+        ...(userData.user?.user_metadata ?? {}),
+        passwordChanged: true,
+      },
+    });
     if (error) {
       return false;
     }
 
+    setHasChangedPassword(true);
     return true;
   }
 
@@ -195,6 +208,7 @@ export default function HomePage() {
           <div className="panel-content">
             <ParticipantStatus
               currentUser={currentUser}
+              hasChangedPassword={hasChangedPassword}
               onPasswordChange={handlePasswordChange}
               onSignOut={handleSignOut}
             />
@@ -233,10 +247,12 @@ export default function HomePage() {
 
 function ParticipantStatus({
   currentUser,
+  hasChangedPassword,
   onPasswordChange,
   onSignOut,
 }: {
   currentUser: User | null;
+  hasChangedPassword: boolean;
   onPasswordChange: (newPassword: string) => Promise<boolean>;
   onSignOut: () => void;
 }) {
@@ -324,23 +340,27 @@ function ParticipantStatus({
           </p>
         </div>
         <div className="participant-actions">
-          <button
-            className="button button-secondary"
-            type="button"
-            onClick={() => {
-              setIsChangingPassword((value) => !value);
-              setPasswordMessage("");
-              setPasswordStatus("idle");
-            }}
-          >
-            Cambiar contraseña
-          </button>
+          {!hasChangedPassword ? (
+            <button
+              className="button button-secondary"
+              type="button"
+              onClick={() => {
+                setIsChangingPassword((value) => !value);
+                setPasswordMessage("");
+                setPasswordStatus("idle");
+              }}
+            >
+              Cambiar contraseña
+            </button>
+          ) : (
+            <span className="badge badge-ok">Contraseña actualizada</span>
+          )}
           <button className="button button-secondary" type="button" onClick={onSignOut}>
             Cerrar sesión
           </button>
         </div>
       </div>
-      {isChangingPassword ? (
+      {isChangingPassword && !hasChangedPassword ? (
         <form className="password-panel" onSubmit={handlePasswordSubmit}>
           <div className="grid-two">
             <div className="field">
