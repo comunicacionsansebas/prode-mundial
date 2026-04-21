@@ -9,7 +9,7 @@ import { getSupabaseClient } from "@/lib/supabase";
 import { clearCurrentUserId, getInitialData, upsertPrediction } from "@/lib/storage";
 import type { AppData, Match, Prediction, User } from "@/lib/types";
 
-type ActiveTab = "fixture" | "ranking" | "rules";
+type ActiveTab = "fixture" | "ranking" | "rules" | "prizes";
 
 const tournamentName = "Prode Mundial 2026";
 
@@ -202,6 +202,7 @@ export default function HomePage() {
                 ["fixture", "Fixture"],
                 ["ranking", "Ranking"],
                 ["rules", "Reglas"],
+                ["prizes", "Premios"],
               ].map(([tab, label]) => (
                 <button
                   key={tab}
@@ -219,6 +220,7 @@ export default function HomePage() {
             ) : null}
             {activeTab === "ranking" ? <Ranking standings={standings} /> : null}
             {activeTab === "rules" ? <Rules /> : null}
+            {activeTab === "prizes" ? <Prizes /> : null}
           </div>
         </section>
       </main>
@@ -609,6 +611,23 @@ function Rules() {
       <div className="message">
         <strong>Ejemplo:</strong> si el resultado real es Argentina 2 - 1 Argelia y una persona pronosticó 2 - 0,
         suma 5 puntos por acertar ganador y 2 puntos por acertar los goles de Argentina.
+      </div>
+    </div>
+  );
+}
+
+function Prizes() {
+  return (
+    <div className="rules-section">
+      <div>
+        <h3 className="section-title">Premios</h3>
+        <p className="section-copy">
+          Todavía estamos definiendo los premios del prode. Próximamente vamos a compartir más información en esta
+          sección.
+        </p>
+      </div>
+      <div className="message">
+        Mientras tanto, seguí cargando tus pronósticos y participando con el equipo de San Sebas.
       </div>
     </div>
   );
