@@ -340,6 +340,21 @@ select:disabled {
   border-color: #f5c7c0;
 }
 
+.link-button {
+  width: fit-content;
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  padding: 0;
+  font-weight: 800;
+  text-align: left;
+}
+
+.link-button:hover {
+  color: var(--primary-dark);
+  text-decoration: underline;
+}
+
 .tabs {
   display: flex;
   gap: 8px;

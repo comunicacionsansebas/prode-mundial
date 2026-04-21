@@ -35,23 +35,47 @@ export default function HomePage() {
   const [data, setData] = useState<AppData | null>(null);
   const [currentUserId, setCurrentUser] = useState<string | null>(null);
   const [hasChangedPassword, setHasChangedPassword] = useState(false);
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
+  const [loginEmail, setLoginEmail] = useState("");
   const [activeTab, setActiveTab] = useState<ActiveTab>("fixture");
   const [message, setMessage] = useState("");
 
   useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+
     async function loadData() {
       const initialData = await getInitialData();
-      const { data: sessionData } = await getSupabaseClient().auth.getSession();
+      const supabase = getSupabaseClient();
+      const { data: sessionData } = await supabase.auth.getSession();
       const sessionEmail = sessionData.session?.user.email?.toLowerCase();
       const sessionUser = initialData.users.find((user) => user.email.toLowerCase() === sessionEmail);
       setData(initialData);
       setCurrentUser(sessionUser?.id ?? null);
       setHasChangedPassword(Boolean(sessionData.session?.user.user_metadata?.passwordChanged));
+
+      const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (event !== "PASSWORD_RECOVERY") return;
+
+        const nextData = await getInitialData();
+        const recoveryEmail = session?.user.email?.toLowerCase();
+        const recoveryUser = nextData.users.find((user) => user.email.toLowerCase() === recoveryEmail);
+        setData(nextData);
+        setCurrentUser(recoveryUser?.id ?? null);
+        setHasChangedPassword(Boolean(session?.user.user_metadata?.passwordChanged));
+        setIsPasswordRecovery(true);
+        setMessage("Ingresá una nueva contraseña para recuperar tu acceso.");
+      });
+
+      unsubscribe = () => listener.subscription.unsubscribe();
     }
 
     loadData().catch(() => {
       setMessage("No se pudo conectar con la base de datos. Revisá las variables de Supabase.");
     });
+
+    return () => {
+      unsubscribe?.();
+    };
   }, []);
 
   const currentUser = useMemo(
@@ -98,6 +122,25 @@ export default function HomePage() {
     setActiveTab("fixture");
   }
 
+  async function handleForgotPassword() {
+    const email = loginEmail.trim();
+    if (!email) {
+      setMessage("Ingresá tu email y después tocá Olvidé mi contraseña.");
+      return;
+    }
+
+    const { error } = await getSupabaseClient().auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin,
+    });
+
+    if (error) {
+      setMessage("No pudimos enviar el mail de recuperación. Revisá el email ingresado.");
+      return;
+    }
+
+    setMessage("Te enviamos un email para recuperar tu contraseña.");
+  }
+
   async function handlePrediction(match: Match, homeScore: number, awayScore: number): Promise<boolean> {
     if (!data || !currentUser) return false;
 
@@ -116,6 +159,7 @@ export default function HomePage() {
     clearCurrentUserId();
     setCurrentUser(null);
     setHasChangedPassword(false);
+    setIsPasswordRecovery(false);
     setMessage("Sesión cerrada. Ingresá con email y contraseña para jugar.");
   }
 
@@ -138,6 +182,7 @@ export default function HomePage() {
     }
 
     setHasChangedPassword(true);
+    setIsPasswordRecovery(false);
     return true;
   }
 
@@ -181,7 +226,15 @@ export default function HomePage() {
                 <form className="stack" onSubmit={handleAuth}>
                   <div className="field">
                     <label htmlFor="email">Email</label>
-                    <input id="email" name="email" type="email" autoComplete="email" required />
+                    <input
+                      id="email"
+                      name="email"
+                      type="email"
+                      autoComplete="email"
+                      value={loginEmail}
+                      onChange={(event) => setLoginEmail(event.target.value)}
+                      required
+                    />
                   </div>
                   <div className="field">
                     <label htmlFor="password">Contraseña</label>
@@ -196,6 +249,9 @@ export default function HomePage() {
                   <button className="button button-primary" type="submit">
                     Ingresar
                   </button>
+                  <button className="link-button" type="button" onClick={handleForgotPassword}>
+                    Olvidé mi contraseña
+                  </button>
                 </form>
               </div>
             </section>
@@ -209,6 +265,7 @@ export default function HomePage() {
             <ParticipantStatus
               currentUser={currentUser}
               hasChangedPassword={hasChangedPassword}
+              isPasswordRecovery={isPasswordRecovery}
               onPasswordChange={handlePasswordChange}
               onSignOut={handleSignOut}
             />
@@ -248,17 +305,27 @@ export default function HomePage() {
 function ParticipantStatus({
   currentUser,
   hasChangedPassword,
+  isPasswordRecovery,
   onPasswordChange,
   onSignOut,
 }: {
   currentUser: User | null;
   hasChangedPassword: boolean;
+  isPasswordRecovery: boolean;
   onPasswordChange: (newPassword: string) => Promise<boolean>;
   onSignOut: () => void;
 }) {
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState("");
   const [passwordStatus, setPasswordStatus] = useState<"idle" | "saving" | "saved">("idle");
+
+  useEffect(() => {
+    if (isPasswordRecovery) {
+      setIsChangingPassword(true);
+      setPasswordMessage("");
+      setPasswordStatus("idle");
+    }
+  }, [isPasswordRecovery]);
 
   if (!currentUser) {
     return (
@@ -340,7 +407,7 @@ function ParticipantStatus({
           </p>
         </div>
         <div className="participant-actions">
-          {!hasChangedPassword ? (
+          {!hasChangedPassword || isPasswordRecovery ? (
             <button
               className="button button-secondary"
               type="button"
@@ -350,7 +417,7 @@ function ParticipantStatus({
                 setPasswordStatus("idle");
               }}
             >
-              Cambiar contraseña
+              {isPasswordRecovery ? "Crear nueva contraseña" : "Cambiar contraseña"}
             </button>
           ) : (
             <span className="badge badge-ok">Contraseña actualizada</span>
@@ -360,7 +427,7 @@ function ParticipantStatus({
           </button>
         </div>
       </div>
-      {isChangingPassword && !hasChangedPassword ? (
+      {isChangingPassword && (!hasChangedPassword || isPasswordRecovery) ? (
         <form className="password-panel" onSubmit={handlePasswordSubmit}>
           <div className="grid-two">
             <div className="field">
