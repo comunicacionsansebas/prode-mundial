@@ -10,6 +10,7 @@ import { clearCurrentUserId, getInitialData, upsertPrediction } from "@/lib/stor
 import type { AppData, Match, Prediction, User } from "@/lib/types";
 
 type ActiveTab = "fixture" | "ranking" | "rules" | "prizes";
+type FixtureFilter = "all" | "pending";
 
 const tournamentName = "Prode Mundial 2026";
 
@@ -484,7 +485,34 @@ function Fixture({
   currentUser: User | null;
   onPredict: (match: Match, homeScore: number, awayScore: number) => Promise<boolean>;
 }) {
+  const [fixtureFilter, setFixtureFilter] = useState<FixtureFilter>("all");
   const groups = groupMatches(data.matches);
+  const visibleMatches = data.matches.filter((match) => match.dateVisible);
+  const userPredictions = currentUser
+    ? data.predictions.filter(
+        (prediction) =>
+          prediction.userId === currentUser.id && visibleMatches.some((match) => match.id === prediction.matchId),
+      )
+    : [];
+  const predictedCount = userPredictions.length;
+  const pendingCount = Math.max(visibleMatches.length - predictedCount, 0);
+  const filteredGroups =
+    fixtureFilter === "pending" && currentUser
+      ? groups
+          .map(
+            ([dateLabel, matches]) =>
+              [
+                dateLabel,
+                matches.filter(
+                  (match) =>
+                    !data.predictions.some(
+                      (prediction) => prediction.userId === currentUser.id && prediction.matchId === match.id,
+                    ),
+                ),
+              ] as [string, Match[]],
+          )
+          .filter(([, matches]) => matches.length > 0)
+      : groups;
 
   if (!groups.length) {
     return <div className="message">No hay fechas visibles por ahora.</div>;
@@ -492,7 +520,39 @@ function Fixture({
 
   return (
     <div className="stack">
-      {groups.map(([dateLabel, matches]) => (
+      <div className="fixture-summary">
+        <div>
+          <h3 className="section-title">Tus pronósticos</h3>
+          <p className="section-copy">
+            {currentUser
+              ? `Cargaste ${predictedCount} de ${visibleMatches.length}. Te quedan ${pendingCount} pendientes.`
+              : "Ingresá para ver cuántos pronósticos tenés cargados."}
+          </p>
+        </div>
+        <div className="filter-tabs" aria-label="Filtro de partidos">
+          <button
+            className={`tab ${fixtureFilter === "all" ? "tab-active" : ""}`}
+            type="button"
+            onClick={() => setFixtureFilter("all")}
+          >
+            Todos
+          </button>
+          <button
+            className={`tab ${fixtureFilter === "pending" ? "tab-active" : ""}`}
+            disabled={!currentUser}
+            type="button"
+            onClick={() => setFixtureFilter("pending")}
+          >
+            Pendientes
+          </button>
+        </div>
+      </div>
+
+      {filteredGroups.length ? null : (
+        <div className="message message-success">No tenés partidos pendientes para pronosticar.</div>
+      )}
+
+      {filteredGroups.map(([dateLabel, matches]) => (
         <section className="date-group" key={dateLabel}>
           <h3 className="date-heading">{dateLabel}</h3>
           {matches.map((match) => {
@@ -513,6 +573,7 @@ function Fixture({
                   <span className={`badge ${closed ? "badge-closed" : "badge-ok"}`}>
                     {closed ? "Cerrado" : "Abierto"}
                   </span>
+                  {prediction ? <span className="badge badge-ok">Ya pronosticado</span> : null}
                 </div>
 
                 <PredictionScoreForm
@@ -703,6 +764,28 @@ function Rules() {
         <strong>Ejemplo:</strong> si el resultado real es Argentina 2 - 1 Argelia y una persona pronosticó 2 - 0,
         suma 5 puntos por acertar ganador y 2 puntos por acertar los goles de Argentina.
       </div>
+
+      <section className="faq-section">
+        <h3 className="section-title">Preguntas frecuentes</h3>
+        <div className="faq-grid">
+          <article className="faq-item">
+            <h4>¿Hasta cuándo puedo cambiar un pronóstico?</h4>
+            <p>Hasta un minuto antes del comienzo del partido. Después queda cerrado automáticamente.</p>
+          </article>
+          <article className="faq-item">
+            <h4>¿Qué pasa si no pronostico un partido?</h4>
+            <p>No suma puntos para ese partido. Podés usar el filtro Pendientes para revisar qué te falta cargar.</p>
+          </article>
+          <article className="faq-item">
+            <h4>¿Cómo sé si ya guardé un pronóstico?</h4>
+            <p>La tarjeta del partido muestra la etiqueta Ya pronosticado y el botón confirma Guardado al cargarlo.</p>
+          </article>
+          <article className="faq-item">
+            <h4>¿Qué hago si olvidé mi contraseña?</h4>
+            <p>En la pantalla de acceso, escribí tu email y tocá Olvidé mi contraseña para recibir el enlace de recuperación.</p>
+          </article>
+        </div>
+      </section>
     </div>
   );
 }

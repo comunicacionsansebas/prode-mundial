@@ -450,6 +450,23 @@ select:disabled {
   gap: 12px;
 }
 
+.fixture-summary {
+  border: 1px solid #cde6df;
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: #fbfffe;
+  padding: 16px;
+}
+
+.filter-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .date-heading {
   margin: 14px 0 0;
   font-size: 18px;
@@ -602,6 +619,35 @@ select:disabled {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
+}
+
+.faq-section {
+  display: grid;
+  gap: 12px;
+}
+
+.faq-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.faq-item {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  padding: 14px;
+}
+
+.faq-item h4 {
+  margin: 0 0 6px;
+  font-size: 16px;
+}
+
+.faq-item p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
 }
 
 .rule-card {
@@ -778,7 +824,13 @@ select:disabled {
     display: none;
   }
 
-  .rules-grid {
+  .fixture-summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .rules-grid,
+  .faq-grid {
     grid-template-columns: 1fr;
   }
 }
