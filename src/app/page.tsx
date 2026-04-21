@@ -209,9 +209,11 @@ export default function HomePage() {
               <h1 id="hero-title">{tournamentName}</h1>
               <p>¡Bienvenidos al prode mundial 2026 para los empleados del Barrio San Sebastián!</p>
             </div>
-            <button className="button button-secondary" type="button" onClick={() => setActiveTab("fixture")}>
-              Ingresar al prode
-            </button>
+            {!currentUser ? (
+              <button className="button button-secondary" type="button" onClick={() => setActiveTab("fixture")}>
+                Ingresar al prode
+              </button>
+            ) : null}
           </div>
 
           {!currentUser ? (
