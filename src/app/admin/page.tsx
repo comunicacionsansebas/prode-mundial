@@ -58,6 +58,14 @@ function parseCsvLine(line: string): string[] {
   return values;
 }
 
+function escapeCsvValue(value: string | number | boolean | null | undefined): string {
+  const normalized = value == null ? "" : String(value);
+  if (/[",\n;]/.test(normalized)) {
+    return `"${normalized.replace(/"/g, '""')}"`;
+  }
+  return normalized;
+}
+
 function parseResultsCsv(csv: string, matches: Match[]) {
   const lines = csv
     .split(/\r?\n/)
@@ -272,6 +280,96 @@ export default function AdminPage() {
     setMessage("Backup exportado correctamente.");
   }
 
+  function downloadCsv(filename: string, header: string[], rows: Array<Array<string | number | boolean | null | undefined>>) {
+    const content = [header.map(escapeCsvValue).join(","), ...rows.map((row) => row.map(escapeCsvValue).join(","))].join("\n");
+    const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleExportCsvBackup() {
+    if (!data) return;
+
+    const now = new Date();
+    const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+      now.getDate(),
+    ).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}-${String(now.getMinutes()).padStart(2, "0")}`;
+
+    downloadCsv(
+      `backup-prode-users-${timestamp}.csv`,
+      ["id", "nombre", "apellido", "email", "area", "creado_en"],
+      data.users.map((user) => [user.id, user.firstName, user.lastName, user.email, user.area ?? "", user.createdAt]),
+    );
+
+    downloadCsv(
+      `backup-prode-matches-${timestamp}.csv`,
+      ["id", "fecha", "visible", "inicio", "local", "visitante"],
+      data.matches.map((match) => [
+        match.id,
+        match.dateLabel,
+        match.dateVisible,
+        match.startsAt,
+        match.homeTeam,
+        match.awayTeam,
+      ]),
+    );
+
+    downloadCsv(
+      `backup-prode-results-${timestamp}.csv`,
+      ["match_id", "local", "visitante", "resultado", "goles_local", "goles_visitante"],
+      data.matches
+        .filter((match) => match.result)
+        .map((match) => [
+          match.id,
+          match.homeTeam,
+          match.awayTeam,
+          match.result?.outcome ?? "",
+          match.result?.homeScore ?? "",
+          match.result?.awayScore ?? "",
+        ]),
+    );
+
+    downloadCsv(
+      `backup-prode-predictions-${timestamp}.csv`,
+      ["id", "user_id", "participante", "match_id", "local", "visitante", "resultado", "goles_local", "goles_visitante", "actualizado_en"],
+      data.predictions.map((prediction) => {
+        const user = data.users.find((item) => item.id === prediction.userId);
+        const match = data.matches.find((item) => item.id === prediction.matchId);
+        return [
+          prediction.id,
+          prediction.userId,
+          user ? getUserName(user) : "",
+          prediction.matchId,
+          match?.homeTeam ?? "",
+          match?.awayTeam ?? "",
+          prediction.outcome,
+          prediction.homeScore ?? "",
+          prediction.awayScore ?? "",
+          prediction.updatedAt,
+        ];
+      }),
+    );
+
+    downloadCsv(
+      `backup-prode-ranking-${timestamp}.csv`,
+      ["posicion", "participante", "area", "puntos", "aciertos", "pronosticos_cargados"],
+      standings.map((standing, index) => [
+        index + 1,
+        getUserName(standing.user),
+        standing.user.area ?? "",
+        standing.points,
+        standing.hits,
+        standing.predictionsCount,
+      ]),
+    );
+
+    setMessage("CSV exportados correctamente.");
+  }
+
   async function handleMatchSave(match: Match) {
     if (!data) return;
     setData(await updateMatch(data, match));
@@ -403,6 +501,9 @@ export default function AdminPage() {
                 </button>
                 <button className="button button-secondary" type="button" onClick={handleExportBackup}>
                   Exportar backup prode
+                </button>
+                <button className="button button-secondary" type="button" onClick={handleExportCsvBackup}>
+                  Exportar CSV prode
                 </button>
                 <div className="message">
                   Los botones de carga reemplazan el fixture visible y limpian pronosticos/resultados. Los usuarios se
