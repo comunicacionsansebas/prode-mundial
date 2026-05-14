@@ -247,6 +247,31 @@ export default function AdminPage() {
     setMessage("Liga Profesional Argentina cargada para prueba. Se limpiaron resultados y pronosticos anteriores.");
   }
 
+  function handleExportBackup() {
+    if (!data) return;
+
+    const now = new Date();
+    const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+      now.getDate(),
+    ).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}-${String(now.getMinutes()).padStart(2, "0")}`;
+
+    const backup = {
+      exportedAt: now.toISOString(),
+      app: "prode-mundial",
+      standings,
+      data,
+    };
+
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `backup-prode-${timestamp}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setMessage("Backup exportado correctamente.");
+  }
+
   async function handleMatchSave(match: Match) {
     if (!data) return;
     setData(await updateMatch(data, match));
@@ -375,6 +400,9 @@ export default function AdminPage() {
                 </button>
                 <button className="button button-soft" type="button" onClick={handleLoadArgentinaLeagueFixtures}>
                   Liga Profesional Argentina
+                </button>
+                <button className="button button-secondary" type="button" onClick={handleExportBackup}>
+                  Exportar backup prode
                 </button>
                 <div className="message">
                   Los botones de carga reemplazan el fixture visible y limpian pronosticos/resultados. Los usuarios se
