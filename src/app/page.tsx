@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { Logo } from "@/components/Logo";
+import { TeamNameWithFlag } from "@/components/TeamNameWithFlag";
 import { calculateStandings, getOutcomeFromScore, getUserName, isMatchClosed, outcomeLabels } from "@/lib/scoring";
 import { getSupabaseClient } from "@/lib/supabase";
 import { clearCurrentUserId, getInitialData, upsertPrediction } from "@/lib/storage";
@@ -566,7 +567,8 @@ function Fixture({
                 <div className="match-top">
                   <div className="teams">
                     <strong>
-                      {match.homeTeam} vs {match.awayTeam}
+                      <TeamNameWithFlag team={match.homeTeam} /> <span className="match-versus">vs</span>{" "}
+                      <TeamNameWithFlag team={match.awayTeam} />
                     </strong>
                     <span className="match-time">{formatDateTime(match.startsAt)}</span>
                   </div>
@@ -653,7 +655,9 @@ function PredictionScoreForm({
     >
       <div className="score-inputs">
         <label className="score-field">
-          <span>{match.homeTeam}</span>
+          <span>
+            <TeamNameWithFlag compact team={match.homeTeam} />
+          </span>
           <input
             disabled={!currentUser || closed}
             min="0"
@@ -665,7 +669,9 @@ function PredictionScoreForm({
         </label>
         <span className="score-separator">-</span>
         <label className="score-field">
-          <span>{match.awayTeam}</span>
+          <span>
+            <TeamNameWithFlag compact team={match.awayTeam} />
+          </span>
           <input
             disabled={!currentUser || closed}
             min="0"

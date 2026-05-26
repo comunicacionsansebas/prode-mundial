@@ -495,6 +495,29 @@ select:disabled {
   font-size: 18px;
 }
 
+.team-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  vertical-align: middle;
+}
+
+.team-label-compact {
+  gap: 5px;
+}
+
+.team-flag {
+  flex: 0 0 auto;
+  font-size: 1.05em;
+  line-height: 1;
+}
+
+.match-versus {
+  color: var(--muted);
+  font-weight: 700;
+}
+
 .match-time {
   color: var(--muted);
   font-size: 14px;
