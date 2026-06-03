@@ -4,7 +4,6 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { Logo } from "@/components/Logo";
-import { TeamNameWithFlag } from "@/components/TeamNameWithFlag";
 import { calculateStandings, getOutcomeFromScore, getUserName, isMatchClosed, outcomeLabels } from "@/lib/scoring";
 import { getSupabaseClient } from "@/lib/supabase";
 import { clearCurrentUserId, getInitialData, upsertPrediction } from "@/lib/storage";
@@ -567,8 +566,7 @@ function Fixture({
                 <div className="match-top">
                   <div className="teams">
                     <strong>
-                      <TeamNameWithFlag team={match.homeTeam} /> <span className="match-versus">vs</span>{" "}
-                      <TeamNameWithFlag team={match.awayTeam} />
+                      {match.homeTeam} vs {match.awayTeam}
                     </strong>
                     <span className="match-time">{formatDateTime(match.startsAt)}</span>
                   </div>
@@ -655,9 +653,7 @@ function PredictionScoreForm({
     >
       <div className="score-inputs">
         <label className="score-field">
-          <span>
-            <TeamNameWithFlag compact team={match.homeTeam} />
-          </span>
+          <span>{match.homeTeam}</span>
           <input
             disabled={!currentUser || closed}
             min="0"
@@ -669,9 +665,7 @@ function PredictionScoreForm({
         </label>
         <span className="score-separator">-</span>
         <label className="score-field">
-          <span>
-            <TeamNameWithFlag compact team={match.awayTeam} />
-          </span>
+          <span>{match.awayTeam}</span>
           <input
             disabled={!currentUser || closed}
             min="0"
@@ -802,12 +796,32 @@ function Prizes() {
       <div>
         <h3 className="section-title">Premios</h3>
         <p className="section-copy">
-          Todavía estamos definiendo los premios del prode. Próximamente vamos a compartir más información en esta
-          sección.
+          Estos son los premios definidos para el prode. ¡A meterle con los pronósticos!
         </p>
       </div>
+
+      <div className="rules-grid">
+        <article className="rule-card">
+          <span className="rule-points">1° premio</span>
+          <h4>Camiseta titular de Argentina + pelota del Mundial 2026</h4>
+          <p>Para quien termine en el primer puesto del ranking general.</p>
+        </article>
+
+        <article className="rule-card">
+          <span className="rule-points">2° premio</span>
+          <h4>Camiseta titular de Argentina</h4>
+          <p>Para quien termine en el segundo puesto del ranking general.</p>
+        </article>
+
+        <article className="rule-card">
+          <span className="rule-points">3° premio</span>
+          <h4>Camiseta suplente de Argentina</h4>
+          <p>Para quien termine en el tercer puesto del ranking general.</p>
+        </article>
+      </div>
+
       <div className="message">
-        Mientras tanto, seguí cargando tus pronósticos y participando con el equipo de San Sebas.
+        Seguimos sumando motivos para jugar: pronosticá, compartí con el equipo y peleá por tu lugar en el podio.
       </div>
     </div>
   );
