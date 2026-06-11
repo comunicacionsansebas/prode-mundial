@@ -21,13 +21,40 @@ function formatDateTime(value: string): string {
   }).format(new Date(value));
 }
 
+function toTitleCase(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function getDateLabelSuffix(label: string): string {
+  const separator = " - ";
+  const index = label.indexOf(separator);
+  return index >= 0 ? label.slice(index) : "";
+}
+
+function formatGroupDateLabel(match: Match): string {
+  const parts = new Intl.DateTimeFormat("es-AR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone: "America/Buenos_Aires",
+  }).formatToParts(new Date(match.startsAt));
+
+  const weekday = parts.find((part) => part.type === "weekday")?.value ?? "";
+  const day = parts.find((part) => part.type === "day")?.value ?? "";
+  const month = parts.find((part) => part.type === "month")?.value ?? "";
+  const suffix = getDateLabelSuffix(match.dateLabel);
+
+  return `${toTitleCase(weekday)} ${day} de ${month}${suffix}`;
+}
+
 function groupMatches(matches: Match[]): Array<[string, Match[]]> {
   const groups = new Map<string, Match[]>();
   matches
     .filter((match) => match.dateVisible)
     .forEach((match) => {
-      const current = groups.get(match.dateLabel) ?? [];
-      groups.set(match.dateLabel, [...current, match]);
+      const dateLabel = formatGroupDateLabel(match);
+      const current = groups.get(dateLabel) ?? [];
+      groups.set(dateLabel, [...current, match]);
     });
   return Array.from(groups.entries());
 }
