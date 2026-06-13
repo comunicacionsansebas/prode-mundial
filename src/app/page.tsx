@@ -720,7 +720,12 @@ function PredictionScoreForm({
 
 function Ranking({ standings }: { standings: ReturnType<typeof calculateStandings> }) {
   return (
-    <div className="table-wrap">
+    <div className="stack">
+      <div className="message">
+        La tabla se ordena por <strong>puntos totales</strong>. En caso de empate, desempata por{" "}
+        <strong>aciertos</strong>.
+      </div>
+      <div className="table-wrap">
       <table className="table">
         <thead>
           <tr>
@@ -747,6 +752,7 @@ function Ranking({ standings }: { standings: ReturnType<typeof calculateStanding
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
