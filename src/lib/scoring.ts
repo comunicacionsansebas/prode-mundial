@@ -56,14 +56,12 @@ export function calculateStandings(data: AppData): Standing[] {
   return data.users
     .map((user) => {
       const userPredictions = data.predictions.filter((prediction) => prediction.userId === user.id);
-      const points = userPredictions.reduce((total, prediction) => {
+      const scoredPredictions = userPredictions.map((prediction) => {
         const match = matchesById.get(prediction.matchId);
-        return match ? total + scorePrediction(prediction, match) : total;
-      }, 0);
-      const hits = userPredictions.filter((prediction) => {
-        const match = matchesById.get(prediction.matchId);
-        return match?.result && prediction.outcome === match.result.outcome;
-      }).length;
+        return match ? scorePrediction(prediction, match) : 0;
+      });
+      const points = scoredPredictions.reduce((total, score) => total + score, 0);
+      const hits = scoredPredictions.filter((score) => score > 0).length;
 
       return {
         user,
