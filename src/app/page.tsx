@@ -722,8 +722,8 @@ function Ranking({ standings }: { standings: ReturnType<typeof calculateStanding
   return (
     <div className="stack">
       <div className="message">
-        La tabla se ordena por <strong>puntos totales</strong>. En caso de empate, desempata por{" "}
-        <strong>aciertos</strong>.
+        La posición en el ranking se define primero por <strong>puntos totales</strong>. Si dos participantes tienen
+        los mismos puntos, queda arriba quien tenga más <strong>aciertos</strong> (partidos en los que sumó puntos).
       </div>
       <div className="table-wrap">
       <table className="table">
