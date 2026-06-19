@@ -78,6 +78,20 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return (await response.json()) as T;
 }
 
+async function requestAll<T>(path: string): Promise<T[]> {
+  const pageSize = 1000;
+  const rows: T[] = [];
+
+  for (let offset = 0; ; offset += pageSize) {
+    const page = await request<T[]>(`${path}${path.includes("?") ? "&" : "?"}limit=${pageSize}&offset=${offset}`);
+    rows.push(...page);
+
+    if (page.length < pageSize) {
+      return rows;
+    }
+  }
+}
+
 function toUser(user: DbUser): User {
   return {
     id: user.id,
@@ -132,10 +146,10 @@ function toDbMatch(match: Match) {
 
 export async function getInitialData(): Promise<AppData> {
   const [users, matches, results, predictions] = await Promise.all([
-    request<DbUser[]>("users?select=*&order=created_at.asc"),
-    request<DbMatch[]>("matches?select=*&order=starts_at.asc"),
-    request<DbResult[]>("results?select=*"),
-    request<DbPrediction[]>("predictions?select=*&order=updated_at.asc"),
+    requestAll<DbUser>("users?select=*&order=created_at.asc"),
+    requestAll<DbMatch>("matches?select=*&order=starts_at.asc"),
+    requestAll<DbResult>("results?select=*"),
+    requestAll<DbPrediction>("predictions?select=*&order=updated_at.asc"),
   ]);
 
   const resultsByMatchId = new Map(results.map((result) => [result.match_id, result]));
