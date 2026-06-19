@@ -56,13 +56,15 @@ function getConfig() {
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const { url, key } = getConfig();
+  const isReadRequest = !init.method || init.method.toUpperCase() === "GET";
   const response = await fetch(`${url}/rest/v1/${path}`, {
     ...init,
+    cache: "no-store",
     headers: {
       apikey: key,
       Authorization: `Bearer ${key}`,
       "Content-Type": "application/json",
-      Prefer: "return=representation",
+      Prefer: isReadRequest ? "count=exact" : "return=representation",
       ...init.headers,
     },
   });
