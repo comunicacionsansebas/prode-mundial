@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { Logo } from "@/components/Logo";
-import { calculateStandings, getOutcomeFromScore, getUserName, isMatchClosed, outcomeLabels } from "@/lib/scoring";
+import { calculateStandings, getOutcomeFromScore, getUserName, isMatchClosed, outcomeLabels, scorePrediction } from "@/lib/scoring";
 import { getSupabaseClient } from "@/lib/supabase";
 import { clearCurrentUserId, getInitialData, upsertPrediction } from "@/lib/storage";
 import type { AppData, Match, Prediction, User } from "@/lib/types";
@@ -27,6 +27,14 @@ function formatFinalResult(match: Match): string | null {
   }
 
   return `${match.homeTeam} ${match.result.homeScore} - ${match.result.awayScore} ${match.awayTeam}`;
+}
+
+function formatPredictionScore(prediction: Prediction): string | null {
+  if (prediction.homeScore === undefined || prediction.awayScore === undefined) {
+    return null;
+  }
+
+  return `${prediction.homeScore} - ${prediction.awayScore}`;
 }
 
 function toTitleCase(value: string): string {
@@ -596,6 +604,8 @@ function Fixture({
               (item) => item.userId === currentUser?.id && item.matchId === match.id,
             );
             const finalResult = formatFinalResult(match);
+            const predictionScore = prediction ? formatPredictionScore(prediction) : null;
+            const earnedPoints = prediction && match.result ? scorePrediction(prediction, match) : null;
 
             return (
               <article className="panel match-card" key={match.id}>
@@ -615,6 +625,18 @@ function Fixture({
                 {finalResult ? (
                   <div className="message">
                     <strong>Resultado final:</strong> {finalResult}
+                    {predictionScore ? (
+                      <>
+                        <br />
+                        <strong>Tu pronóstico:</strong> {predictionScore}
+                      </>
+                    ) : null}
+                    {earnedPoints !== null ? (
+                      <>
+                        <br />
+                        <strong>Puntos obtenidos:</strong> {earnedPoints}
+                      </>
+                    ) : null}
                   </div>
                 ) : null}
 
