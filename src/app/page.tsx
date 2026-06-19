@@ -21,6 +21,14 @@ function formatDateTime(value: string): string {
   }).format(new Date(value));
 }
 
+function formatFinalResult(match: Match): string | null {
+  if (!match.result || match.result.homeScore === undefined || match.result.awayScore === undefined) {
+    return null;
+  }
+
+  return `${match.homeTeam} ${match.result.homeScore} - ${match.result.awayScore} ${match.awayTeam}`;
+}
+
 function toTitleCase(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
@@ -587,6 +595,7 @@ function Fixture({
             const prediction = data.predictions.find(
               (item) => item.userId === currentUser?.id && item.matchId === match.id,
             );
+            const finalResult = formatFinalResult(match);
 
             return (
               <article className="panel match-card" key={match.id}>
@@ -602,6 +611,12 @@ function Fixture({
                   </span>
                   {prediction ? <span className="badge badge-ok">Ya pronosticado</span> : null}
                 </div>
+
+                {finalResult ? (
+                  <div className="message">
+                    <strong>Resultado final:</strong> {finalResult}
+                  </div>
+                ) : null}
 
                 <PredictionScoreForm
                   closed={closed}
