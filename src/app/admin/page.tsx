@@ -255,6 +255,11 @@ export default function AdminPage() {
     setMessage("Liga Profesional Argentina cargada para prueba. Se limpiaron resultados y pronosticos anteriores.");
   }
 
+  async function handleRefreshData() {
+    setData(await getInitialData());
+    setMessage("Datos del panel actualizados.");
+  }
+
   function handleExportBackup() {
     if (!data) return;
 
@@ -504,6 +509,9 @@ export default function AdminPage() {
                 </button>
                 <button className="button button-secondary" type="button" onClick={handleExportCsvBackup}>
                   Exportar CSV prode
+                </button>
+                <button className="button button-secondary" type="button" onClick={handleRefreshData}>
+                  Actualizar datos
                 </button>
                 <div className="message">
                   Los botones de carga reemplazan el fixture visible y limpian pronosticos/resultados. Los usuarios se
