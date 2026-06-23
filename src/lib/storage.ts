@@ -149,7 +149,7 @@ export async function getInitialData(): Promise<AppData> {
     requestAll<DbUser>("users?select=*&order=created_at.asc"),
     requestAll<DbMatch>("matches?select=*&order=starts_at.asc"),
     requestAll<DbResult>("results?select=*"),
-    requestAll<DbPrediction>("predictions?select=*&order=updated_at.asc"),
+    requestAll<DbPrediction>("predictions?select=*&order=id.asc"),
   ]);
 
   const resultsByMatchId = new Map(results.map((result) => [result.match_id, result]));
