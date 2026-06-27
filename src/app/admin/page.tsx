@@ -6,7 +6,6 @@ import { Header } from "@/components/Header";
 import { calculateStandings, getOutcomeFromScore, getUserName } from "@/lib/scoring";
 import {
   getInitialData,
-  loadArgentinaLeagueFixtures,
   loadGroupStageFixtures,
   loadRoundOf16Fixtures,
   updateMatch,
@@ -291,11 +290,6 @@ export default function AdminPage() {
     setMessage("Fase de grupos del Mundial 2026 cargada. Se limpiaron resultados y pronosticos anteriores.");
   }
 
-  async function handleLoadArgentinaLeagueFixtures() {
-    setData(await loadArgentinaLeagueFixtures());
-    setMessage("Liga Profesional Argentina cargada para prueba. Se limpiaron resultados y pronosticos anteriores.");
-  }
-
   async function handleLoadRoundOf16Fixtures() {
     try {
       const nextData = await loadRoundOf16Fixtures();
@@ -553,9 +547,6 @@ export default function AdminPage() {
                 <button className="button button-primary" type="button" onClick={handleLoadGroupStageFixtures}>
                   Cargar fase de grupos Mundial 2026
                 </button>
-                <button className="button button-soft" type="button" onClick={handleLoadArgentinaLeagueFixtures}>
-                  Liga Profesional Argentina
-                </button>
                 <button className="button button-secondary" type="button" onClick={handleLoadRoundOf16Fixtures}>
                   Agregar 16vos confirmados
                 </button>
@@ -628,32 +619,32 @@ function SystemHealth({
       <div>
         <h3 className="section-title">Estado del sistema</h3>
         <p className="section-copy">
-          Este resumen te ayuda a controlar que la base est&eacute; consistente. No hace falta liberar memoria manualmente:
-          los datos quedan guardados en Supabase.
+          Este resumen te ayuda a controlar que la base est&eacute; consistente. Los datos quedan guardados en
+          Supabase, as&iacute; que no hace falta liberar memoria manualmente.
         </p>
       </div>
 
-      <div className="rules-grid">
-        <article className="rule-card">
-          <span className="rule-points">{summary.usersCount}</span>
-          <h4>Usuarios</h4>
-          <p>Participantes cargados en el prode.</p>
-        </article>
-        <article className="rule-card">
-          <span className="rule-points">{summary.matchesCount}</span>
-          <h4>Partidos</h4>
-          <p>{summary.visibleMatchesCount} visibles actualmente.</p>
-        </article>
-        <article className="rule-card">
-          <span className="rule-points">{summary.resultsCount}</span>
-          <h4>Resultados</h4>
-          <p>Partidos que ya tienen resultado final cargado.</p>
-        </article>
-        <article className="rule-card">
-          <span className="rule-points">{summary.predictionsCount}</span>
-          <h4>Pron&oacute;sticos</h4>
-          <p>{summary.completionPercent}% del total posible cargado.</p>
-        </article>
+      <div className="system-health-list">
+        <div className="system-health-row">
+          <span className="system-health-label">Usuarios</span>
+          <strong className="system-health-value">{summary.usersCount}</strong>
+        </div>
+        <div className="system-health-row">
+          <span className="system-health-label">Partidos</span>
+          <strong className="system-health-value">
+            {summary.matchesCount} total · {summary.visibleMatchesCount} visibles
+          </strong>
+        </div>
+        <div className="system-health-row">
+          <span className="system-health-label">Resultados cargados</span>
+          <strong className="system-health-value">{summary.resultsCount}</strong>
+        </div>
+        <div className="system-health-row">
+          <span className="system-health-label">Pron&oacute;sticos guardados</span>
+          <strong className="system-health-value">
+            {summary.predictionsCount} · {summary.completionPercent}% del total posible
+          </strong>
+        </div>
       </div>
 
       <div className={`message ${hasIssues ? "message-warning" : "message-success"}`}>

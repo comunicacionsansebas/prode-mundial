@@ -679,6 +679,37 @@ select:disabled {
   line-height: 1.4;
 }
 
+.system-health-list {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  overflow: hidden;
+}
+
+.system-health-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.system-health-row:last-child {
+  border-bottom: 0;
+}
+
+.system-health-label {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.system-health-value {
+  color: var(--foreground);
+  font-weight: 900;
+  text-align: right;
+}
+
 .message {
   border-radius: var(--radius);
   border: 1px solid var(--line);
@@ -832,6 +863,15 @@ select:disabled {
   .rules-grid,
   .faq-grid {
     grid-template-columns: 1fr;
+  }
+
+  .system-health-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .system-health-value {
+    text-align: left;
   }
 }
 
