@@ -37,6 +37,10 @@ function normalizeText(value: string): string {
     .replace(/\s+/g, " ");
 }
 
+function isRoundOf16Match(match: Match): boolean {
+  return normalizeText(match.dateLabel).includes("16vos");
+}
+
 function parseCsvLine(line: string): string[] {
   const values: string[] = [];
   let current = "";
@@ -257,8 +261,14 @@ export default function AdminPage() {
   }
 
   async function handleLoadRoundOf16Fixtures() {
-    setData(await loadRoundOf16Fixtures());
-    setMessage("16vos confirmados agregados al fixture sin modificar la fase de grupos.");
+    try {
+      const nextData = await loadRoundOf16Fixtures();
+      setData(nextData);
+      const roundOf16Count = nextData.matches.filter(isRoundOf16Match).length;
+      setMessage(`16vos confirmados agregados al fixture. Partidos de 16vos cargados: ${roundOf16Count}.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "No se pudieron agregar los 16vos confirmados.");
+    }
   }
 
   async function handleRefreshData() {
