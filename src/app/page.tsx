@@ -11,6 +11,7 @@ import type { AppData, Match, Prediction, User } from "@/lib/types";
 
 type ActiveTab = "fixture" | "ranking" | "rules" | "prizes";
 type FixtureFilter = "all" | "pending";
+type FixtureStage = "groups" | "16vos";
 
 const tournamentName = "Prode Mundial 2026";
 
@@ -44,7 +45,29 @@ function toTitleCase(value: string): string {
 function getDateLabelSuffix(label: string): string {
   const separator = " - ";
   const index = label.indexOf(separator);
-  return index >= 0 ? label.slice(index) : "";
+  if (index >= 0) return label.slice(index);
+
+  const normalized = label
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+  if (["16vos", "fase de grupos", "grupos", "octavos", "cuartos", "semis", "semifinales", "final"].includes(normalized)) {
+    return ` - ${label}`;
+  }
+
+  return "";
+}
+
+function getFixtureStage(match: Match): FixtureStage {
+  const normalized = match.dateLabel
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+  return normalized.includes("16vos") ? "16vos" : "groups";
 }
 
 function formatGroupDateLabel(match: Match): string {
@@ -529,8 +552,9 @@ function Fixture({
   onPredict: (match: Match, homeScore: number, awayScore: number) => Promise<boolean>;
 }) {
   const [fixtureFilter, setFixtureFilter] = useState<FixtureFilter>("all");
-  const groups = groupMatches(data.matches);
-  const visibleMatches = data.matches.filter((match) => match.dateVisible);
+  const [fixtureStage, setFixtureStage] = useState<FixtureStage>("groups");
+  const visibleMatches = data.matches.filter((match) => match.dateVisible && getFixtureStage(match) === fixtureStage);
+  const groups = groupMatches(visibleMatches);
   const userPredictions = currentUser
     ? data.predictions.filter(
         (prediction) =>
@@ -572,22 +596,40 @@ function Fixture({
               : "Ingresá para ver cuántos pronósticos tenés cargados."}
           </p>
         </div>
-        <div className="filter-tabs" aria-label="Filtro de partidos">
-          <button
-            className={`tab ${fixtureFilter === "all" ? "tab-active" : ""}`}
-            type="button"
-            onClick={() => setFixtureFilter("all")}
-          >
-            Todos
-          </button>
-          <button
-            className={`tab ${fixtureFilter === "pending" ? "tab-active" : ""}`}
-            disabled={!currentUser}
-            type="button"
-            onClick={() => setFixtureFilter("pending")}
-          >
-            Pendientes
-          </button>
+        <div className="stack" style={{ gap: 10 }}>
+          <div className="filter-tabs" aria-label="Fase del fixture">
+            <button
+              className={`tab ${fixtureStage === "groups" ? "tab-active" : ""}`}
+              type="button"
+              onClick={() => setFixtureStage("groups")}
+            >
+              Fase de grupos
+            </button>
+            <button
+              className={`tab ${fixtureStage === "16vos" ? "tab-active" : ""}`}
+              type="button"
+              onClick={() => setFixtureStage("16vos")}
+            >
+              16vos
+            </button>
+          </div>
+          <div className="filter-tabs" aria-label="Filtro de partidos">
+            <button
+              className={`tab ${fixtureFilter === "all" ? "tab-active" : ""}`}
+              type="button"
+              onClick={() => setFixtureFilter("all")}
+            >
+              Todos
+            </button>
+            <button
+              className={`tab ${fixtureFilter === "pending" ? "tab-active" : ""}`}
+              disabled={!currentUser}
+              type="button"
+              onClick={() => setFixtureFilter("pending")}
+            >
+              Pendientes
+            </button>
+          </div>
         </div>
       </div>
 

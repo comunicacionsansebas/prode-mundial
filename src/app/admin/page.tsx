@@ -8,6 +8,7 @@ import {
   getInitialData,
   loadArgentinaLeagueFixtures,
   loadGroupStageFixtures,
+  loadRoundOf16Fixtures,
   updateMatch,
   updateMatchResults,
   upsertMatches,
@@ -253,6 +254,11 @@ export default function AdminPage() {
   async function handleLoadArgentinaLeagueFixtures() {
     setData(await loadArgentinaLeagueFixtures());
     setMessage("Liga Profesional Argentina cargada para prueba. Se limpiaron resultados y pronosticos anteriores.");
+  }
+
+  async function handleLoadRoundOf16Fixtures() {
+    setData(await loadRoundOf16Fixtures());
+    setMessage("16vos confirmados agregados al fixture sin modificar la fase de grupos.");
   }
 
   async function handleRefreshData() {
@@ -503,6 +509,9 @@ export default function AdminPage() {
                 </button>
                 <button className="button button-soft" type="button" onClick={handleLoadArgentinaLeagueFixtures}>
                   Liga Profesional Argentina
+                </button>
+                <button className="button button-secondary" type="button" onClick={handleLoadRoundOf16Fixtures}>
+                  Agregar 16vos confirmados
                 </button>
                 <button className="button button-secondary" type="button" onClick={handleExportBackup}>
                   Exportar backup prode

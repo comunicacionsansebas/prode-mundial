@@ -3,6 +3,7 @@
 import { demoData } from "./demoData";
 import { argentinaLeagueFixtures } from "./argentinaLeagueFixtures";
 import { groupStageFixtures } from "./groupStageFixtures";
+import { roundOf16Fixtures } from "./roundOf16Fixtures";
 import type { AppData, Match, MatchOutcome, Prediction, User } from "./types";
 
 type DbUser = {
@@ -339,6 +340,10 @@ export async function loadGroupStageFixtures(): Promise<AppData> {
 
 export async function loadArgentinaLeagueFixtures(): Promise<AppData> {
   return replaceFixtures(argentinaLeagueFixtures);
+}
+
+export async function loadRoundOf16Fixtures(): Promise<AppData> {
+  return upsertMatches(roundOf16Fixtures);
 }
 
 export async function resetDemoData(): Promise<AppData> {
