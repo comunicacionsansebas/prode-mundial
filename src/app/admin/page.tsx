@@ -177,12 +177,48 @@ function toGoogleSheetsCsvUrl(url: string, gid?: string): string {
   return `${baseUrl}?output=csv${gid?.trim() ? `&gid=${gid.trim()}` : ""}`;
 }
 
+function getHealthSummary(data: AppData) {
+  const matchIds = new Set(data.matches.map((match) => match.id));
+  const userIds = new Set(data.users.map((user) => user.id));
+  const duplicateKeys = new Set<string>();
+  const seenKeys = new Set<string>();
+
+  data.predictions.forEach((prediction) => {
+    const key = `${prediction.userId}::${prediction.matchId}`;
+    if (seenKeys.has(key)) {
+      duplicateKeys.add(key);
+      return;
+    }
+    seenKeys.add(key);
+  });
+
+  const predictionsWithoutUser = data.predictions.filter((prediction) => !userIds.has(prediction.userId)).length;
+  const predictionsWithoutMatch = data.predictions.filter((prediction) => !matchIds.has(prediction.matchId)).length;
+  const resultsCount = data.matches.filter((match) => match.result).length;
+  const visibleMatches = data.matches.filter((match) => match.dateVisible).length;
+  const possiblePredictions = data.users.length * data.matches.length;
+
+  return {
+    usersCount: data.users.length,
+    matchesCount: data.matches.length,
+    visibleMatchesCount: visibleMatches,
+    resultsCount,
+    predictionsCount: data.predictions.length,
+    possiblePredictions,
+    completionPercent: possiblePredictions ? Math.round((data.predictions.length / possiblePredictions) * 100) : 0,
+    duplicatePredictions: duplicateKeys.size,
+    predictionsWithoutUser,
+    predictionsWithoutMatch,
+  };
+}
+
 export default function AdminPage() {
   const [data, setData] = useState<AppData | null>(null);
   const [isAllowed, setIsAllowed] = useState(false);
   const [adminPinValue, setAdminPinValue] = useState("");
   const [message, setMessage] = useState("");
   const standings = useMemo(() => (data ? calculateStandings(data) : []), [data]);
+  const healthSummary = useMemo(() => (data ? getHealthSummary(data) : null), [data]);
 
   useEffect(() => {
     getInitialData()
@@ -539,6 +575,7 @@ export default function AdminPage() {
                 <div className="message">
                   Los puntajes se recalculan al guardar resultados. Desempate: mayor cantidad de aciertos.
                 </div>
+                {healthSummary ? <SystemHealth summary={healthSummary} /> : null}
                 <div className="table-wrap">
                   <table className="table">
                     <thead>
@@ -575,6 +612,61 @@ export default function AdminPage() {
       </main>
       <Footer />
     </div>
+  );
+}
+
+function SystemHealth({
+  summary,
+}: {
+  summary: ReturnType<typeof getHealthSummary>;
+}) {
+  const hasIssues =
+    summary.duplicatePredictions > 0 || summary.predictionsWithoutUser > 0 || summary.predictionsWithoutMatch > 0;
+
+  return (
+    <section className="stack" style={{ gap: 12 }}>
+      <div>
+        <h3 className="section-title">Estado del sistema</h3>
+        <p className="section-copy">
+          Este resumen te ayuda a controlar que la base est&eacute; consistente. No hace falta liberar memoria manualmente:
+          los datos quedan guardados en Supabase.
+        </p>
+      </div>
+
+      <div className="rules-grid">
+        <article className="rule-card">
+          <span className="rule-points">{summary.usersCount}</span>
+          <h4>Usuarios</h4>
+          <p>Participantes cargados en el prode.</p>
+        </article>
+        <article className="rule-card">
+          <span className="rule-points">{summary.matchesCount}</span>
+          <h4>Partidos</h4>
+          <p>{summary.visibleMatchesCount} visibles actualmente.</p>
+        </article>
+        <article className="rule-card">
+          <span className="rule-points">{summary.resultsCount}</span>
+          <h4>Resultados</h4>
+          <p>Partidos que ya tienen resultado final cargado.</p>
+        </article>
+        <article className="rule-card">
+          <span className="rule-points">{summary.predictionsCount}</span>
+          <h4>Pron&oacute;sticos</h4>
+          <p>{summary.completionPercent}% del total posible cargado.</p>
+        </article>
+      </div>
+
+      <div className={`message ${hasIssues ? "message-warning" : "message-success"}`}>
+        {hasIssues
+          ? `Revisi&oacute;n sugerida: duplicados ${summary.duplicatePredictions}, sin usuario ${summary.predictionsWithoutUser}, sin partido ${summary.predictionsWithoutMatch}.`
+          : "Chequeo correcto: no se detectaron pron&oacute;sticos duplicados ni registros hu&eacute;rfanos."}
+      </div>
+
+      <div className="message">
+        Capacidad actual: {summary.predictionsCount} pron&oacute;sticos guardados sobre un m&aacute;ximo te&oacute;rico de{" "}
+        {summary.possiblePredictions}. Est&aacute;n muy por debajo de un volumen problem&aacute;tico para esta app.
+      </div>
+    </section>
   );
 }
 
