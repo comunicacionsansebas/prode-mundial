@@ -145,6 +145,10 @@ function toDbMatch(match: Match) {
   };
 }
 
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
 export async function getInitialData(): Promise<AppData> {
   const [users, matches, results, predictions] = await Promise.all([
     requestAll<DbUser>("users?select=*&order=created_at.asc"),
@@ -289,10 +293,17 @@ export async function upsertMatches(matches: Match[]): Promise<AppData> {
     const existingId = currentByPairAndStart.get(
       `${match.homeTeam.trim().toLowerCase()}|${match.awayTeam.trim().toLowerCase()}|${match.startsAt}`,
     );
-    return {
-      id: existingId ?? match.id,
-      ...toDbMatch(match),
-    };
+    return existingId
+      ? {
+          id: existingId,
+          ...toDbMatch(match),
+        }
+      : isUuid(match.id)
+        ? {
+            id: match.id,
+            ...toDbMatch(match),
+          }
+        : toDbMatch(match);
   });
 
   await request<DbMatch[]>("matches?on_conflict=id", {
