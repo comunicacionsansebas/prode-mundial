@@ -581,10 +581,6 @@ function Fixture({
           .filter(([, matches]) => matches.length > 0)
       : groups;
 
-  if (!groups.length) {
-    return <div className="message">No hay fechas visibles por ahora.</div>;
-  }
-
   return (
     <div className="stack">
       <div className="fixture-summary">
@@ -633,9 +629,13 @@ function Fixture({
         </div>
       </div>
 
-      {filteredGroups.length ? null : (
+      {!groups.length ? (
+        <div className="message">
+          {fixtureStage === "16vos" ? "Todavía no hay partidos cargados para 16vos." : "No hay fechas visibles por ahora."}
+        </div>
+      ) : !filteredGroups.length ? (
         <div className="message message-success">No tenés partidos pendientes para pronosticar.</div>
-      )}
+      ) : null}
 
       {filteredGroups.map(([dateLabel, matches]) => (
         <section className="date-group" key={dateLabel}>
