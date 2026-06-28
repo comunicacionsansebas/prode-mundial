@@ -349,24 +349,49 @@ export async function upsertMatches(matches: Match[]): Promise<AppData> {
 
   const payload = matches.map((match) => {
     const existingId = currentByPairAndStart.get(buildMatchKey(match));
-    return existingId
-      ? {
+    if (existingId) {
+      return {
+        kind: "update" as const,
+        value: {
           id: existingId,
           ...toDbMatch(match),
-        }
-      : isUuid(match.id)
-        ? {
-            id: match.id,
-            ...toDbMatch(match),
-          }
-        : toDbMatch(match);
+        },
+      };
+    }
+
+    if (isUuid(match.id)) {
+      return {
+        kind: "update" as const,
+        value: {
+          id: match.id,
+          ...toDbMatch(match),
+        },
+      };
+    }
+
+    return {
+      kind: "insert" as const,
+      value: toDbMatch(match),
+    };
   });
 
-  await request<DbMatch[]>("matches?on_conflict=id", {
-    method: "POST",
-    headers: { Prefer: "resolution=merge-duplicates,return=representation" },
-    body: JSON.stringify(payload),
-  });
+  const matchesToUpdate = payload.filter((item) => item.kind === "update").map((item) => item.value);
+  const matchesToInsert = payload.filter((item) => item.kind === "insert").map((item) => item.value);
+
+  if (matchesToUpdate.length) {
+    await request<DbMatch[]>("matches?on_conflict=id", {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+      body: JSON.stringify(matchesToUpdate),
+    });
+  }
+
+  if (matchesToInsert.length) {
+    await request<DbMatch[]>("matches", {
+      method: "POST",
+      body: JSON.stringify(matchesToInsert),
+    });
+  }
 
   return getInitialData();
 }
