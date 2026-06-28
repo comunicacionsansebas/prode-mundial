@@ -149,6 +149,27 @@ function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
+function normalizeText(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ");
+}
+
+function toTimestamp(value: string): number {
+  return new Date(value).getTime();
+}
+
+function buildMatchKey(match: Pick<Match, "homeTeam" | "awayTeam" | "startsAt">): string {
+  return `${normalizeText(match.homeTeam)}|${normalizeText(match.awayTeam)}|${toTimestamp(match.startsAt)}`;
+}
+
+function buildMatchDeletePath(matchIds: string[]): string {
+  return `matches?id=in.(${matchIds.map((id) => `"${id}"`).join(",")})`;
+}
+
 export async function getInitialData(): Promise<AppData> {
   const [users, matches, results, predictions] = await Promise.all([
     requestAll<DbUser>("users?select=*&order=created_at.asc"),
@@ -282,17 +303,52 @@ export async function upsertMatches(matches: Match[]): Promise<AppData> {
   if (!matches.length) return getInitialData();
 
   const current = await getInitialData();
-  const currentByPairAndStart = new Map(
-    current.matches.map((match) => [
-      `${match.homeTeam.trim().toLowerCase()}|${match.awayTeam.trim().toLowerCase()}|${match.startsAt}`,
-      match.id,
-    ]),
-  );
+  const targetKeys = new Set(matches.map((match) => buildMatchKey(match)));
+  const currentMatchesByKey = new Map<string, Match[]>();
+
+  current.matches.forEach((match) => {
+    const key = buildMatchKey(match);
+    const group = currentMatchesByKey.get(key) ?? [];
+    group.push(match);
+    currentMatchesByKey.set(key, group);
+  });
+
+  const predictionsByMatchId = new Map<string, number>();
+  current.predictions.forEach((prediction) => {
+    predictionsByMatchId.set(prediction.matchId, (predictionsByMatchId.get(prediction.matchId) ?? 0) + 1);
+  });
+
+  const duplicateMatchIdsToDelete: string[] = [];
+  const currentByPairAndStart = new Map<string, string>();
+
+  currentMatchesByKey.forEach((group, key) => {
+    const sortedGroup = [...group].sort((a, b) => {
+      const aWeight = (predictionsByMatchId.get(a.id) ?? 0) + (a.result ? 10_000 : 0);
+      const bWeight = (predictionsByMatchId.get(b.id) ?? 0) + (b.result ? 10_000 : 0);
+      return bWeight - aWeight;
+    });
+
+    const primaryMatch = sortedGroup[0];
+    currentByPairAndStart.set(key, primaryMatch.id);
+
+    if (!targetKeys.has(key) || sortedGroup.length < 2) {
+      return;
+    }
+
+    sortedGroup.slice(1).forEach((match) => {
+      const hasPredictions = (predictionsByMatchId.get(match.id) ?? 0) > 0;
+      if (!hasPredictions && !match.result) {
+        duplicateMatchIdsToDelete.push(match.id);
+      }
+    });
+  });
+
+  if (duplicateMatchIdsToDelete.length) {
+    await request<void>(buildMatchDeletePath(duplicateMatchIdsToDelete), { method: "DELETE" });
+  }
 
   const payload = matches.map((match) => {
-    const existingId = currentByPairAndStart.get(
-      `${match.homeTeam.trim().toLowerCase()}|${match.awayTeam.trim().toLowerCase()}|${match.startsAt}`,
-    );
+    const existingId = currentByPairAndStart.get(buildMatchKey(match));
     return existingId
       ? {
           id: existingId,
