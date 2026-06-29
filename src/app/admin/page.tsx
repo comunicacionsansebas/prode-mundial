@@ -4,14 +4,7 @@ import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { calculateStandings, getOutcomeFromScore, getUserName } from "@/lib/scoring";
-import {
-  getInitialData,
-  loadGroupStageFixtures,
-  loadRoundOf16Fixtures,
-  updateMatch,
-  updateMatchResults,
-  upsertMatches,
-} from "@/lib/storage";
+import { getInitialData, loadGroupStageFixtures, updateMatch, updateMatchResults } from "@/lib/storage";
 import type { AppData, Match, MatchOutcome } from "@/lib/types";
 
 const adminPin = process.env.NEXT_PUBLIC_ADMIN_PIN || "admin123";
@@ -38,6 +31,17 @@ function normalizeText(value: string): string {
 
 function isRoundOf16Match(match: Match): boolean {
   return normalizeText(match.dateLabel).includes("16vos");
+}
+
+function filterFinishedTournamentData(data: AppData): AppData {
+  const matches = data.matches.filter((match) => !isRoundOf16Match(match));
+  const matchIds = new Set(matches.map((match) => match.id));
+
+  return {
+    users: data.users,
+    matches,
+    predictions: data.predictions.filter((prediction) => matchIds.has(prediction.matchId)),
+  };
 }
 
 function parseCsvLine(line: string): string[] {
@@ -112,68 +116,12 @@ function parseResultsCsv(csv: string, matches: Match[]) {
   return { errors, updatedMatches };
 }
 
-function parseBoolean(value: string | undefined): boolean {
-  const normalized = normalizeText(value ?? "");
-  if (!normalized) return true;
-  return ["true", "si", "sí", "1", "visible", "x"].includes(normalized);
-}
-
-function parseDateTime(dateValue: string, timeValue: string): string | null {
-  const date = dateValue.trim();
-  const time = timeValue.trim();
-  if (!date || !time) return null;
-
-  const dateParts = date.includes("/") ? date.split("/") : date.split("-");
-  if (dateParts.length !== 3) return null;
-
-  const [first, second, third] = dateParts.map(Number);
-  const year = first > 1900 ? first : third;
-  const month = first > 1900 ? second : second;
-  const day = first > 1900 ? third : first;
-  const [hour, minute = 0] = time.split(":").map(Number);
-
-  if (![year, month, day, hour, minute].every(Number.isFinite)) return null;
-  return new Date(year, month - 1, day, hour, minute).toISOString();
-}
-
-function parseFixtureCsv(csv: string) {
-  const lines = csv
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-  const dataLines = lines[0]?.toLowerCase().includes("local") ? lines.slice(1) : lines;
-  const errors: string[] = [];
-  const matches: Match[] = [];
-
-  dataLines.forEach((line, index) => {
-    const [date, time, phase, homeTeam, awayTeam, visible] = parseCsvLine(line);
-    const rowNumber = index + 1;
-    const startsAt = parseDateTime(date, time);
-
-    if (!startsAt || !phase || !homeTeam || !awayTeam) {
-      errors.push(`Fila ${rowNumber}: formato invalido.`);
-      return;
-    }
-
-    matches.push({
-      id: `match-${Date.now().toString(36)}-${index}`,
-      dateLabel: phase,
-      dateVisible: parseBoolean(visible),
-      startsAt,
-      homeTeam,
-      awayTeam,
-    });
-  });
-
-  return { errors, matches };
-}
-
-function toGoogleSheetsCsvUrl(url: string, gid?: string): string {
+function toGoogleSheetsCsvUrl(url: string): string {
   const trimmed = url.trim();
   if (!trimmed.includes("docs.google.com/spreadsheets")) return trimmed;
   if (trimmed.includes("output=csv")) return trimmed;
   const baseUrl = trimmed.replace("/pubhtml", "/pub").split("?")[0];
-  return `${baseUrl}?output=csv${gid?.trim() ? `&gid=${gid.trim()}` : ""}`;
+  return `${baseUrl}?output=csv`;
 }
 
 function getHealthSummary(data: AppData) {
@@ -216,8 +164,9 @@ export default function AdminPage() {
   const [isAllowed, setIsAllowed] = useState(false);
   const [adminPinValue, setAdminPinValue] = useState("");
   const [message, setMessage] = useState("");
-  const standings = useMemo(() => (data ? calculateStandings(data) : []), [data]);
-  const healthSummary = useMemo(() => (data ? getHealthSummary(data) : null), [data]);
+  const visibleData = useMemo(() => (data ? filterFinishedTournamentData(data) : null), [data]);
+  const standings = useMemo(() => (visibleData ? calculateStandings(visibleData) : []), [visibleData]);
+  const healthSummary = useMemo(() => (visibleData ? getHealthSummary(visibleData) : null), [visibleData]);
 
   useEffect(() => {
     getInitialData()
@@ -264,7 +213,7 @@ export default function AdminPage() {
         result = responseText ? JSON.parse(responseText) : {};
       } catch {
         result = {
-          error: responseText || `El servidor respondio con estado ${response.status}, pero no devolvio JSON.`,
+          error: responseText || `El servidor respondió con estado ${response.status}, pero no devolvió JSON.`,
         };
       }
 
@@ -287,18 +236,7 @@ export default function AdminPage() {
 
   async function handleLoadGroupStageFixtures() {
     setData(await loadGroupStageFixtures());
-    setMessage("Fase de grupos del Mundial 2026 cargada. Se limpiaron resultados y pronosticos anteriores.");
-  }
-
-  async function handleLoadRoundOf16Fixtures() {
-    try {
-      const nextData = await loadRoundOf16Fixtures();
-      setData(nextData);
-      const roundOf16Count = nextData.matches.filter(isRoundOf16Match).length;
-      setMessage(`16vos confirmados agregados al fixture. Partidos de 16vos cargados: ${roundOf16Count}.`);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "No se pudieron agregar los 16vos confirmados.");
-    }
+    setMessage("Fase de grupos del Mundial 2026 cargada. Se limpiaron resultados y pronósticos anteriores.");
   }
 
   async function handleRefreshData() {
@@ -307,7 +245,7 @@ export default function AdminPage() {
   }
 
   function handleExportBackup() {
-    if (!data) return;
+    if (!visibleData) return;
 
     const now = new Date();
     const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
@@ -318,7 +256,7 @@ export default function AdminPage() {
       exportedAt: now.toISOString(),
       app: "prode-mundial",
       standings,
-      data,
+      data: visibleData,
     };
 
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
@@ -343,7 +281,7 @@ export default function AdminPage() {
   }
 
   function handleExportCsvBackup() {
-    if (!data) return;
+    if (!visibleData) return;
 
     const now = new Date();
     const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
@@ -353,13 +291,13 @@ export default function AdminPage() {
     downloadCsv(
       `backup-prode-users-${timestamp}.csv`,
       ["id", "nombre", "apellido", "email", "area", "creado_en"],
-      data.users.map((user) => [user.id, user.firstName, user.lastName, user.email, user.area ?? "", user.createdAt]),
+      visibleData.users.map((user) => [user.id, user.firstName, user.lastName, user.email, user.area ?? "", user.createdAt]),
     );
 
     downloadCsv(
       `backup-prode-matches-${timestamp}.csv`,
       ["id", "fecha", "visible", "inicio", "local", "visitante"],
-      data.matches.map((match) => [
+      visibleData.matches.map((match) => [
         match.id,
         match.dateLabel,
         match.dateVisible,
@@ -372,7 +310,7 @@ export default function AdminPage() {
     downloadCsv(
       `backup-prode-results-${timestamp}.csv`,
       ["match_id", "local", "visitante", "resultado", "goles_local", "goles_visitante"],
-      data.matches
+      visibleData.matches
         .filter((match) => match.result)
         .map((match) => [
           match.id,
@@ -387,9 +325,9 @@ export default function AdminPage() {
     downloadCsv(
       `backup-prode-predictions-${timestamp}.csv`,
       ["id", "user_id", "participante", "match_id", "local", "visitante", "resultado", "goles_local", "goles_visitante", "actualizado_en"],
-      data.predictions.map((prediction) => {
-        const user = data.users.find((item) => item.id === prediction.userId);
-        const match = data.matches.find((item) => item.id === prediction.matchId);
+      visibleData.predictions.map((prediction) => {
+        const user = visibleData.users.find((item) => item.id === prediction.userId);
+        const match = visibleData.matches.find((item) => item.id === prediction.matchId);
         return [
           prediction.id,
           prediction.userId,
@@ -424,17 +362,17 @@ export default function AdminPage() {
   async function handleMatchSave(match: Match) {
     if (!data) return;
     setData(await updateMatch(data, match));
-    setMessage("Partido actualizado y puntajes recalculados automaticamente.");
+    setMessage("Partido actualizado y puntajes recalculados automáticamente.");
   }
 
   async function handleBulkResultsImport(csv: string) {
-    if (!data) return;
+    if (!visibleData) return;
     if (!csv.trim()) {
       setMessage("Pegá al menos una fila de resultados para importar.");
       return;
     }
 
-    const { errors, updatedMatches } = parseResultsCsv(csv, data.matches);
+    const { errors, updatedMatches } = parseResultsCsv(csv, visibleData.matches);
 
     if (!updatedMatches.length) {
       setMessage(errors.length ? errors.join(" ") : "No se encontraron resultados para importar.");
@@ -450,7 +388,7 @@ export default function AdminPage() {
   }
 
   async function handleGoogleSheetsImport(url: string) {
-    if (!data) return;
+    if (!visibleData) return;
     if (!url.trim()) {
       setMessage("Pegá la URL publicada de Google Sheets para sincronizar.");
       return;
@@ -460,10 +398,10 @@ export default function AdminPage() {
       const csvUrl = toGoogleSheetsCsvUrl(url);
       const response = await fetch(csvUrl);
       if (!response.ok) {
-        throw new Error(`Google Sheets respondio con estado ${response.status}.`);
+        throw new Error(`Google Sheets respondió con estado ${response.status}.`);
       }
       const csv = await response.text();
-      const { errors, updatedMatches } = parseResultsCsv(csv, data.matches);
+      const { errors, updatedMatches } = parseResultsCsv(csv, visibleData.matches);
 
       if (!updatedMatches.length) {
         setMessage(errors.length ? errors.join(" ") : "No se encontraron resultados para importar desde Google Sheets.");
@@ -481,38 +419,6 @@ export default function AdminPage() {
     }
   }
 
-  async function handleFixtureGoogleSheetsImport(url: string, gid: string) {
-    if (!data) return;
-    if (!url.trim()) {
-      setMessage("Pegá la URL publicada de Google Sheets para sincronizar el fixture.");
-      return;
-    }
-
-    try {
-      const csvUrl = toGoogleSheetsCsvUrl(url, gid);
-      const response = await fetch(csvUrl);
-      if (!response.ok) {
-        throw new Error(`Google Sheets respondio con estado ${response.status}.`);
-      }
-      const csv = await response.text();
-      const { errors, matches } = parseFixtureCsv(csv);
-
-      if (!matches.length) {
-        setMessage(errors.length ? errors.join(" ") : "No se encontraron partidos para importar desde Google Sheets.");
-        return;
-      }
-
-      setData(await upsertMatches(matches));
-      setMessage(
-        `Partidos sincronizados desde Google Sheets: ${matches.length}. ${
-          errors.length ? `Filas con error: ${errors.join(" ")}` : "Fixture actualizado."
-        }`,
-      );
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "No se pudo leer el fixture desde Google Sheets.");
-    }
-  }
-
   return (
     <div className="app-shell">
       <Header />
@@ -520,9 +426,7 @@ export default function AdminPage() {
         <section className="panel">
           <div className="panel-content">
             <h1 className="section-title">Panel administrador</h1>
-            <p className="section-copy">
-              Carga resultados, edita partidos y administra la visualizacion de fechas.
-            </p>
+            <p className="section-copy">Control final del prode, ranking, resultados y backups de la fase de grupos.</p>
             {message ? <div className="message message-success">{message}</div> : null}
 
             {!isAllowed ? (
@@ -539,16 +443,13 @@ export default function AdminPage() {
           </div>
         </section>
 
-        {isAllowed && data ? (
+        {isAllowed && visibleData ? (
           <section className="admin-grid" style={{ marginTop: 18 }}>
             <aside className="panel">
               <div className="panel-content stack">
                 <h2 className="section-title">Acciones</h2>
                 <button className="button button-primary" type="button" onClick={handleLoadGroupStageFixtures}>
                   Cargar fase de grupos Mundial 2026
-                </button>
-                <button className="button button-secondary" type="button" onClick={handleLoadRoundOf16Fixtures}>
-                  Agregar 16vos confirmados
                 </button>
                 <button className="button button-secondary" type="button" onClick={handleExportBackup}>
                   Exportar backup prode
@@ -559,9 +460,11 @@ export default function AdminPage() {
                 <button className="button button-secondary" type="button" onClick={handleRefreshData}>
                   Actualizar datos
                 </button>
+                <div className="message message-success">
+                  <strong>Prode finalizado:</strong> esta vista administra y muestra solamente la fase de grupos.
+                </div>
                 <div className="message">
-                  Los botones de carga reemplazan el fixture visible y limpian pronosticos/resultados. Los usuarios se
-                  conservan. Para volver al Mundial, cargá nuevamente la fase de grupos.
+                  Los backups y el recálculo de puntajes siguen disponibles para conservar el cierre final del prode.
                 </div>
                 <div className="message">
                   Los puntajes se recalculan al guardar resultados. Desempate: mayor cantidad de aciertos.
@@ -593,8 +496,7 @@ export default function AdminPage() {
             <section className="stack">
               <EmployeeImporter onImport={handleEmployeeImport} />
               <BulkResultsImporter onGoogleSheetsImport={handleGoogleSheetsImport} onImport={handleBulkResultsImport} />
-              <FixtureImporter onGoogleSheetsImport={handleFixtureGoogleSheetsImport} />
-              {data.matches.map((match) => (
+              {visibleData.matches.map((match) => (
                 <AdminMatchForm key={match.id} match={match} onSave={handleMatchSave} />
               ))}
             </section>
@@ -619,8 +521,8 @@ function SystemHealth({
       <div>
         <h3 className="section-title">Estado del sistema</h3>
         <p className="section-copy">
-          Este resumen te ayuda a controlar que la base est&eacute; consistente. Los datos quedan guardados en
-          Supabase, as&iacute; que no hace falta liberar memoria manualmente.
+          Este resumen te ayuda a controlar que la base esté consistente. Los datos quedan guardados en Supabase, así
+          que no hace falta liberar memoria manualmente.
         </p>
       </div>
 
@@ -640,7 +542,7 @@ function SystemHealth({
           <strong className="system-health-value">{summary.resultsCount}</strong>
         </div>
         <div className="system-health-row">
-          <span className="system-health-label">Pron&oacute;sticos guardados</span>
+          <span className="system-health-label">Pronósticos guardados</span>
           <strong className="system-health-value">
             {summary.predictionsCount} · {summary.completionPercent}% del total posible
           </strong>
@@ -649,13 +551,13 @@ function SystemHealth({
 
       <div className={`message ${hasIssues ? "message-warning" : "message-success"}`}>
         {hasIssues
-          ? `Revisi&oacute;n sugerida: duplicados ${summary.duplicatePredictions}, sin usuario ${summary.predictionsWithoutUser}, sin partido ${summary.predictionsWithoutMatch}.`
-          : "Chequeo correcto: no se detectaron pron&oacute;sticos duplicados ni registros hu&eacute;rfanos."}
+          ? `Revisión sugerida: duplicados ${summary.duplicatePredictions}, sin usuario ${summary.predictionsWithoutUser}, sin partido ${summary.predictionsWithoutMatch}.`
+          : "Chequeo correcto: no se detectaron pronósticos duplicados ni registros huérfanos."}
       </div>
 
       <div className="message">
-        Capacidad actual: {summary.predictionsCount} pron&oacute;sticos guardados sobre un m&aacute;ximo te&oacute;rico de{" "}
-        {summary.possiblePredictions}. Est&aacute;n muy por debajo de un volumen problem&aacute;tico para esta app.
+        Capacidad actual: {summary.predictionsCount} pronósticos guardados sobre un máximo teórico de{" "}
+        {summary.possiblePredictions}. Están muy por debajo de un volumen problemático para esta app.
       </div>
     </section>
   );
@@ -701,51 +603,11 @@ function EmployeeImporter({ onImport }: { onImport: (csv: string) => void }) {
           />
         </div>
         <div className="message">
-          Formato esperado: <strong>nombre, apellido, email, area, password</strong>. Tambien acepta{" "}
+          Formato esperado: <strong>nombre, apellido, email, area, password</strong>. También acepta{" "}
           <strong>contraseña</strong>, <strong>contrasena</strong> o <strong>clave</strong> como columna de password.
         </div>
         <button className="button button-primary" type="button" onClick={() => onImport(csv)}>
           Importar empleados
-        </button>
-      </div>
-    </section>
-  );
-}
-
-function FixtureImporter({
-  onGoogleSheetsImport,
-}: {
-  onGoogleSheetsImport: (url: string, gid: string) => void;
-}) {
-  const [sheetUrl, setSheetUrl] = useState(
-    "https://docs.google.com/spreadsheets/d/e/2PACX-1vQuUWO3K_eJDPCF5exR7XEHPB2kHDAjYvjfGXT0wu7cV9Hq-WYLJy4gqgAW3SKWzM9vExc4h7Wclp4R/pubhtml",
-  );
-  const [gid, setGid] = useState("");
-
-  return (
-    <section className="panel">
-      <div className="panel-content stack">
-        <div>
-          <h2 className="section-title">Importar nuevos partidos</h2>
-          <p className="section-copy">
-            Usalo para octavos, cuartos, semifinales y final. La hoja debe tener columnas: fecha, hora, fase, local,
-            visitante y visible.
-          </p>
-        </div>
-        <div className="field">
-          <label htmlFor="fixtureSheetUrl">URL publicada de Google Sheets</label>
-          <input id="fixtureSheetUrl" value={sheetUrl} onChange={(event) => setSheetUrl(event.target.value)} />
-        </div>
-        <div className="field">
-          <label htmlFor="fixtureGid">GID de la hoja opcional</label>
-          <input id="fixtureGid" placeholder="Ejemplo: 123456789" value={gid} onChange={(event) => setGid(event.target.value)} />
-        </div>
-        <div className="message">
-          Formato esperado: <strong>fecha, hora, fase, local, visitante, visible</strong>. Ejemplo:
-          2026-06-29,16:00,Octavos,Argentina,Dinamarca,true.
-        </div>
-        <button className="button button-primary" type="button" onClick={() => onGoogleSheetsImport(sheetUrl, gid)}>
-          Sincronizar fixture desde Google Sheets
         </button>
       </div>
     </section>

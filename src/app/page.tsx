@@ -3,7 +3,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
-import { Logo } from "@/components/Logo";
 import { calculateStandings, getOutcomeFromScore, getUserName, isMatchClosed, outcomeLabels, scorePrediction } from "@/lib/scoring";
 import { getSupabaseClient } from "@/lib/supabase";
 import { clearCurrentUserId, getInitialData, upsertPrediction } from "@/lib/storage";
@@ -11,9 +10,10 @@ import type { AppData, Match, Prediction, User } from "@/lib/types";
 
 type ActiveTab = "fixture" | "ranking" | "rules" | "prizes";
 type FixtureFilter = "all" | "pending";
-type FixtureStage = "groups" | "16vos";
 
 const tournamentName = "Prode Mundial 2026";
+const finishedNotice =
+  "¡Este prode ya finalizó! Pronto nos estaremos contactando con los ganadores. ¡Muchas gracias por participar!";
 
 function formatDateTime(value: string): string {
   return new Intl.DateTimeFormat("es-AR", {
@@ -53,21 +53,32 @@ function getDateLabelSuffix(label: string): string {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
 
-  if (["16vos", "fase de grupos", "grupos", "octavos", "cuartos", "semis", "semifinales", "final"].includes(normalized)) {
+  if (["fase de grupos", "grupos", "octavos", "cuartos", "semis", "semifinales", "final"].includes(normalized)) {
     return ` - ${label}`;
   }
 
   return "";
 }
 
-function getFixtureStage(match: Match): FixtureStage {
+function isRoundOf16Match(match: Match): boolean {
   const normalized = match.dateLabel
     .trim()
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
 
-  return normalized.includes("16vos") ? "16vos" : "groups";
+  return normalized.includes("16vos");
+}
+
+function filterFinishedTournamentData(data: AppData): AppData {
+  const matches = data.matches.filter((match) => !isRoundOf16Match(match));
+  const matchIds = new Set(matches.map((match) => match.id));
+
+  return {
+    users: data.users,
+    matches,
+    predictions: data.predictions.filter((prediction) => matchIds.has(prediction.matchId)),
+  };
 }
 
 function formatGroupDateLabel(match: Match): string {
@@ -149,7 +160,8 @@ export default function HomePage() {
     () => data?.users.find((user) => user.id === currentUserId) ?? null,
     [data, currentUserId],
   );
-  const standings = useMemo(() => (data ? calculateStandings(data) : []), [data]);
+  const visibleData = useMemo(() => (data ? filterFinishedTournamentData(data) : null), [data]);
+  const standings = useMemo(() => (visibleData ? calculateStandings(visibleData) : []), [visibleData]);
 
   async function handleAuth(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -185,7 +197,7 @@ export default function HomePage() {
     setData(nextData);
     setCurrentUser(user.id);
     setHasChangedPassword(Boolean(authData.user.user_metadata?.passwordChanged));
-    setMessage(`Listo, ${user.firstName}. Ya podés cargar tus pronosticos.`);
+    setMessage(`Listo, ${user.firstName}. Ya podés revisar tus pronósticos.`);
     setActiveTab("fixture");
   }
 
@@ -212,7 +224,7 @@ export default function HomePage() {
     if (!data || !currentUser) return false;
 
     if (isMatchClosed(match)) {
-      setMessage("Este partido ya cerró. Los pronósticos se pueden editar hasta un minuto antes del inicio.");
+      setMessage("Este partido ya cerró. Los pronósticos se podían editar hasta un minuto antes del inicio.");
       return false;
     }
 
@@ -227,7 +239,7 @@ export default function HomePage() {
     setCurrentUser(null);
     setHasChangedPassword(false);
     setIsPasswordRecovery(false);
-    setMessage("Sesión cerrada. Ingresá con email y contraseña para jugar.");
+    setMessage("Sesión cerrada. Ingresá con email y contraseña para consultar tu cuenta.");
   }
 
   async function handlePasswordChange(newPassword: string): Promise<boolean> {
@@ -289,9 +301,7 @@ export default function HomePage() {
                 <h2 className="section-title" id="register-title">
                   Acceso de participantes
                 </h2>
-                <p className="section-copy">
-                  Ingresá con el email y la contraseña asignados por la empresa.
-                </p>
+                <p className="section-copy">Ingresá con el email y la contraseña asignados por la empresa.</p>
                 <form className="stack" onSubmit={handleAuth}>
                   <div className="field">
                     <label htmlFor="email">Email</label>
@@ -327,6 +337,10 @@ export default function HomePage() {
           ) : null}
         </section>
 
+        <div className="message message-success">
+          <strong>{finishedNotice}</strong>
+        </div>
+
         {message ? <div className="message message-success">{message}</div> : null}
 
         <section className="panel">
@@ -357,8 +371,8 @@ export default function HomePage() {
               ))}
             </div>
 
-            {activeTab === "fixture" ? (
-              <Fixture data={data} currentUser={currentUser} onPredict={handlePrediction} />
+            {activeTab === "fixture" && visibleData ? (
+              <Fixture data={visibleData} currentUser={currentUser} onPredict={handlePrediction} />
             ) : null}
             {activeTab === "ranking" ? <Ranking standings={standings} /> : null}
             {activeTab === "rules" ? <Rules /> : null}
@@ -400,21 +414,18 @@ function ParticipantStatus({
     return (
       <div className="participant-status participant-status-empty">
         <div>
-          <h2 className="section-title">Ingresá para jugar</h2>
+          <h2 className="section-title">El prode ya finalizó</h2>
           <p className="section-copy">
-            Usá el email y la contraseña asignados por la empresa. Te recomendamos cambiar tu contraseña al ingresar
-            por primera vez.
+            Usá tu email y la contraseña asignados por la empresa para revisar tu cuenta, el ranking final y los
+            resultados del fixture.
           </p>
           <ul className="intro-list">
-            <li>Acá vas a poder cargar tus pronósticos para el Mundial 2026.</li>
-            <li>Elegí el resultado de cada partido y tocá Guardar pronóstico.</li>
-            <li>Podés modificar tus pronósticos hasta un minuto antes del comienzo del partido.</li>
-            <li>Una vez iniciado el partido, el pronóstico queda cerrado.</li>
-            <li>En la sección Reglas podés consultar cómo funciona el sistema de puntos.</li>
+            <li>El torneo cerró con la fase de grupos.</li>
+            <li>Ya no se pueden cargar ni modificar pronósticos.</li>
+            <li>En Ranking podés ver la tabla final.</li>
+            <li>En Premios podés consultar lo definido para los ganadores.</li>
           </ul>
-          <p className="section-copy">
-            Este prode es una competencia sana y una forma de compartir el Mundial con todo el equipo de San Sebas.
-          </p>
+          <p className="section-copy">Gracias por haber participado y compartido esta experiencia con todo el equipo.</p>
         </div>
       </div>
     );
@@ -528,7 +539,11 @@ function ParticipantStatus({
               disabled={passwordStatus === "saving" || passwordStatus === "saved"}
               type="submit"
             >
-              {passwordStatus === "saving" ? "Guardando..." : passwordStatus === "saved" ? "Guardado" : "Guardar nueva contraseña"}
+              {passwordStatus === "saving"
+                ? "Guardando..."
+                : passwordStatus === "saved"
+                  ? "Guardado"
+                  : "Guardar nueva contraseña"}
             </button>
             <button className="button button-secondary" type="button" onClick={resetPasswordEdition}>
               Cancelar
@@ -552,8 +567,7 @@ function Fixture({
   onPredict: (match: Match, homeScore: number, awayScore: number) => Promise<boolean>;
 }) {
   const [fixtureFilter, setFixtureFilter] = useState<FixtureFilter>("all");
-  const [fixtureStage, setFixtureStage] = useState<FixtureStage>("groups");
-  const visibleMatches = data.matches.filter((match) => match.dateVisible && getFixtureStage(match) === fixtureStage);
+  const visibleMatches = data.matches.filter((match) => match.dateVisible);
   const groups = groupMatches(visibleMatches);
   const userPredictions = currentUser
     ? data.predictions.filter(
@@ -562,7 +576,6 @@ function Fixture({
       )
     : [];
   const predictedCount = userPredictions.length;
-  const pendingCount = Math.max(visibleMatches.length - predictedCount, 0);
   const filteredGroups =
     fixtureFilter === "pending" && currentUser
       ? groups
@@ -583,56 +596,40 @@ function Fixture({
 
   return (
     <div className="stack">
+      <div className="message">
+        <strong>Prode finalizado:</strong> el torneo cerró con la fase de grupos. El fixture y el ranking quedan
+        disponibles solo como consulta.
+      </div>
       <div className="fixture-summary">
         <div>
           <h3 className="section-title">Tus pronósticos</h3>
           <p className="section-copy">
             {currentUser
-              ? `Cargaste ${predictedCount} de ${visibleMatches.length}. Te quedan ${pendingCount} pendientes.`
-              : "Ingresá para ver cuántos pronósticos tenés cargados."}
+              ? `Cargaste ${predictedCount} de ${visibleMatches.length}.`
+              : "Ingresá para ver tus pronósticos cargados."}
           </p>
         </div>
-        <div className="stack" style={{ gap: 10 }}>
-          <div className="filter-tabs" aria-label="Fase del fixture">
-            <button
-              className={`tab ${fixtureStage === "groups" ? "tab-active" : ""}`}
-              type="button"
-              onClick={() => setFixtureStage("groups")}
-            >
-              Fase de grupos
-            </button>
-            <button
-              className={`tab ${fixtureStage === "16vos" ? "tab-active" : ""}`}
-              type="button"
-              onClick={() => setFixtureStage("16vos")}
-            >
-              16vos
-            </button>
-          </div>
-          <div className="filter-tabs" aria-label="Filtro de partidos">
-            <button
-              className={`tab ${fixtureFilter === "all" ? "tab-active" : ""}`}
-              type="button"
-              onClick={() => setFixtureFilter("all")}
-            >
-              Todos
-            </button>
-            <button
-              className={`tab ${fixtureFilter === "pending" ? "tab-active" : ""}`}
-              disabled={!currentUser}
-              type="button"
-              onClick={() => setFixtureFilter("pending")}
-            >
-              Pendientes
-            </button>
-          </div>
+        <div className="filter-tabs" aria-label="Filtro de partidos">
+          <button
+            className={`tab ${fixtureFilter === "all" ? "tab-active" : ""}`}
+            type="button"
+            onClick={() => setFixtureFilter("all")}
+          >
+            Todos
+          </button>
+          <button
+            className={`tab ${fixtureFilter === "pending" ? "tab-active" : ""}`}
+            disabled={!currentUser}
+            type="button"
+            onClick={() => setFixtureFilter("pending")}
+          >
+            Pendientes
+          </button>
         </div>
       </div>
 
       {!groups.length ? (
-        <div className="message">
-          {fixtureStage === "16vos" ? "Todavía no hay partidos cargados para 16vos." : "No hay fechas visibles por ahora."}
-        </div>
+        <div className="message">No hay fechas visibles por ahora.</div>
       ) : !filteredGroups.length ? (
         <div className="message message-success">No tenés partidos pendientes para pronosticar.</div>
       ) : null}
@@ -689,11 +686,9 @@ function Fixture({
                   onPredict={onPredict}
                   prediction={prediction}
                 />
-                {closed ? (
-                  <div className="message message-warning">
-                    Este partido ya cerró. El pronóstico se podía editar hasta un minuto antes del inicio.
-                  </div>
-                ) : null}
+                <div className="message message-warning">
+                  Este prode ya finalizó. Los pronósticos quedaron cerrados y se muestran solo como referencia.
+                </div>
               </article>
             );
           })}
@@ -704,10 +699,8 @@ function Fixture({
 }
 
 function PredictionScoreForm({
-  closed,
   currentUser,
   match,
-  onPredict,
   prediction,
 }: {
   closed: boolean;
@@ -718,7 +711,6 @@ function PredictionScoreForm({
 }) {
   const [homeScore, setHomeScore] = useState(prediction?.homeScore?.toString() ?? "");
   const [awayScore, setAwayScore] = useState(prediction?.awayScore?.toString() ?? "");
-  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
 
   useEffect(() => {
     setHomeScore(prediction?.homeScore?.toString() ?? "");
@@ -734,65 +726,46 @@ function PredictionScoreForm({
     Number.isInteger(parsedAwayScore) &&
     parsedHomeScore >= 0 &&
     parsedAwayScore >= 0;
-  const canSave = Boolean(currentUser && !closed && hasValidScores && saveStatus !== "saving" && saveStatus !== "saved");
   const previewOutcome =
     hasValidScores
       ? outcomeLabels[getOutcomeFromScore(parsedHomeScore, parsedAwayScore)]
-      : "Completá ambos goles";
-  const buttonLabel = saveStatus === "saving" ? "Guardando..." : saveStatus === "saved" ? "Guardado" : "Guardar pronóstico";
-
-  function handleScoreChange(setScore: (value: string) => void, value: string) {
-    setScore(value);
-    setSaveStatus("idle");
-  }
+      : prediction
+        ? "Pronóstico cargado"
+        : "Sin pronóstico";
 
   return (
-    <form
-      className="score-form"
-      onSubmit={async (event) => {
-        event.preventDefault();
-        if (!canSave || parsedHomeScore === null || parsedAwayScore === null) return;
-        setSaveStatus("saving");
-        const wasSaved = await onPredict(match, parsedHomeScore, parsedAwayScore);
-        setSaveStatus(wasSaved ? "saved" : "idle");
-      }}
-    >
+    <form className="score-form" onSubmit={(event) => event.preventDefault()}>
       <div className="score-inputs">
         <label className="score-field">
           <span>{match.homeTeam}</span>
           <input
-            disabled={!currentUser || closed}
+            disabled
             min="0"
             step="1"
             type="number"
             value={homeScore}
-            onChange={(event) => handleScoreChange(setHomeScore, event.target.value)}
+            onChange={(event) => setHomeScore(event.target.value)}
           />
         </label>
         <span className="score-separator">-</span>
         <label className="score-field">
           <span>{match.awayTeam}</span>
           <input
-            disabled={!currentUser || closed}
+            disabled
             min="0"
             step="1"
             type="number"
             value={awayScore}
-            onChange={(event) => handleScoreChange(setAwayScore, event.target.value)}
+            onChange={(event) => setAwayScore(event.target.value)}
           />
         </label>
       </div>
       <div className="score-actions">
         <span className="badge">{previewOutcome}</span>
-        <button className={`button button-primary ${saveStatus === "saved" ? "button-saved" : ""}`} disabled={!canSave} type="submit">
-          {buttonLabel}
+        <button className="button button-secondary" disabled type="button">
+          Prode finalizado
         </button>
       </div>
-      {saveStatus === "saved" ? (
-        <p className="save-feedback" role="status">
-          Cambios guardados para este partido.
-        </p>
-      ) : null}
     </form>
   );
 }
@@ -804,33 +777,36 @@ function Ranking({ standings }: { standings: ReturnType<typeof calculateStanding
         La posición en el ranking se define primero por <strong>puntos totales</strong>. Si dos participantes tienen
         los mismos puntos, queda arriba quien tenga más <strong>aciertos</strong> (partidos en los que sumó puntos).
       </div>
+      <div className="message message-success">
+        <strong>Ranking final del prode:</strong> esta tabla corresponde al cierre de la fase de grupos.
+      </div>
       <div className="table-wrap">
-      <table className="table">
-        <thead>
-          <tr>
-            <th>Posición</th>
-            <th>Participante</th>
-            <th>Área / equipo</th>
-            <th>Puntos</th>
-            <th>Aciertos</th>
-          </tr>
-        </thead>
-        <tbody>
-          {standings.map((standing, index) => (
-            <tr key={standing.user.id}>
-              <td>
-                <span className="ranking-position">{index + 1}</span>
-              </td>
-              <td>{getUserName(standing.user)}</td>
-              <td>{standing.user.area || "-"}</td>
-              <td>
-                <strong>{standing.points}</strong>
-              </td>
-              <td>{standing.hits}</td>
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Posición</th>
+              <th>Participante</th>
+              <th>Área / equipo</th>
+              <th>Puntos</th>
+              <th>Aciertos</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {standings.map((standing, index) => (
+              <tr key={standing.user.id}>
+                <td>
+                  <span className="ranking-position">{index + 1}</span>
+                </td>
+                <td>{getUserName(standing.user)}</td>
+                <td>{standing.user.area || "-"}</td>
+                <td>
+                  <strong>{standing.points}</strong>
+                </td>
+                <td>{standing.hits}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
@@ -842,8 +818,8 @@ function Rules() {
       <div>
         <h3 className="section-title">Reglas del prode</h3>
         <p className="section-copy">
-          Cada participante pronostica el marcador de los partidos habilitados. Los puntos se calculan cuando el
-          administrador carga el resultado final.
+          El prode finalizó con la fase de grupos. Esta sección queda disponible como referencia sobre cómo se calculó
+          el ranking final.
         </p>
       </div>
 
@@ -868,36 +844,14 @@ function Rules() {
       </div>
 
       <div className="message">
-        <strong>Cierre de pronósticos:</strong> se pueden cargar y modificar hasta un minuto antes del comienzo del
-        partido. Una vez cerrado, el partido no permite cambios.
+        <strong>Cierre de pronósticos:</strong> se podían cargar y modificar hasta un minuto antes del comienzo del
+        partido.
       </div>
 
       <div className="message">
-        <strong>Ejemplo:</strong> si el resultado real es Argentina 2 - 1 Argelia y una persona pronosticó 2 - 0,
-        suma 5 puntos por acertar ganador y 2 puntos por acertar los goles de Argentina.
+        <strong>Ejemplo:</strong> si el resultado real era Argentina 2 - 1 Argelia y una persona pronosticó 2 - 0,
+        sumaba 5 puntos por acertar ganador y 2 puntos por acertar los goles de Argentina.
       </div>
-
-      <section className="faq-section">
-        <h3 className="section-title">Preguntas frecuentes</h3>
-        <div className="faq-grid">
-          <article className="faq-item">
-            <h4>¿Hasta cuándo puedo cambiar un pronóstico?</h4>
-            <p>Hasta un minuto antes del comienzo del partido. Después queda cerrado automáticamente.</p>
-          </article>
-          <article className="faq-item">
-            <h4>¿Qué pasa si no pronostico un partido?</h4>
-            <p>No suma puntos para ese partido. Podés usar el filtro Pendientes para revisar qué te falta cargar.</p>
-          </article>
-          <article className="faq-item">
-            <h4>¿Cómo sé si ya guardé un pronóstico?</h4>
-            <p>La tarjeta del partido muestra la etiqueta Ya pronosticado y el botón confirma Guardado al cargarlo.</p>
-          </article>
-          <article className="faq-item">
-            <h4>¿Qué hago si olvidé mi contraseña?</h4>
-            <p>En la pantalla de acceso, escribí tu email y tocá Olvidé mi contraseña para recibir el enlace de recuperación.</p>
-          </article>
-        </div>
-      </section>
     </div>
   );
 }
@@ -907,9 +861,7 @@ function Prizes() {
     <div className="rules-section">
       <div>
         <h3 className="section-title">Premios</h3>
-        <p className="section-copy">
-          Estos son los premios definidos para el prode. ¡A meterle con los pronósticos!
-        </p>
+        <p className="section-copy">Estos fueron los premios definidos para el prode.</p>
       </div>
 
       <div className="rules-grid">
@@ -932,9 +884,7 @@ function Prizes() {
         </article>
       </div>
 
-      <div className="message">
-        Seguimos sumando motivos para jugar: pronosticá, compartí con el equipo y peleá por tu lugar en el podio.
-      </div>
+      <div className="message">Gracias a todo el equipo por haber participado en esta edición del prode.</div>
     </div>
   );
 }
